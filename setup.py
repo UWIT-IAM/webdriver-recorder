@@ -5,4 +5,7 @@ setup(name='webdriver-recorder',
       version='0.1',
       description=(
           'Enhances a selenium webdriver to record screenshots along the way'),
-      py_modules='webdriver_recorder')
+      py_modules='webdriver_recorder',
+      entry_points={'pytest11': [
+          'webdriver_recorder = webdriver_recorder']}
+      )
