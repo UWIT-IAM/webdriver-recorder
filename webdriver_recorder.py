@@ -43,6 +43,18 @@ def get_browser(
             search = (By.XPATH, f"//{tag}[contains(.,'{substring}')]")
             self.wait.until(EC.visibility_of_element_located(search))
 
+        def run_commands(self, commands):
+            """
+            Run a series of commands. The first item in a command is the
+            browser method to call and the remaining items are the args to
+            pass it.
+            """
+            for method, *args in commands:
+                try:
+                    getattr(self, method)(*args)
+                except Exception as e:
+                    raise Exception(f'failed in {method} with {args}')
+
         def snap(self):
             """Grab a screenshot and store it."""
             self.pngs.append(self.get_screenshot_as_base64())
