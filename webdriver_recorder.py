@@ -118,7 +118,7 @@ def report_file():
         fd.write('</body></html>')
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def report_test(report_file, request, browser):
     """
     Print the results to report_file after a test run.
@@ -149,9 +149,11 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
     if report.when == 'call':
-        item.report_call = types.SimpleNamespace(report=report,
-                                                 excinfo=call.excinfo,
-                                                 doc=item.function.__doc__)
+        doc = getattr(getattr(item, 'function', None), '__doc__', None)
+        item.report_call = types.SimpleNamespace(
+            report=report,
+            excinfo=call.excinfo,
+            doc=doc)
 
 
 if __name__ == '__main__':
