@@ -53,7 +53,7 @@ def get_browser(
                 try:
                     getattr(self, method)(*args)
                 except Exception as e:
-                    raise Exception(f'failed in {method} with {args}')
+                    raise BrowserError(f'failed in {method} with {args}', self)
 
         def snap(self):
             """Grab a screenshot and store it."""
@@ -82,6 +82,15 @@ class Waiter(WebDriverWait):
             super().until(*arg, **kwargs)
         finally:
             self.__driver.snap()
+
+
+class BrowserError(Exception):
+    """Error to raise for a meaningful browser error report."""
+    def __init__(self, message, browser):
+        self.message = message
+        self.url = browser.current_url
+        self.logs = browser.get_log('browser')
+        super().__init__(message, self.url, self.logs)
 
 
 @pytest.fixture(scope='session')
@@ -135,8 +144,17 @@ def report_test(report_file, request, browser):
     if request.node.report_call.doc:
         report_file.write(f'<h3>{request.node.report_call.doc}</p>')
     if request.node.report_call.report.failed:
-        report_file.write('<div class="alert alert-danger">{}</div>'.format(
-            request.node.report_call.excinfo))
+        excinfo = request.node.report_call.excinfo
+        if isinstance(excinfo.value, BrowserError):
+            e = excinfo.value
+            msg = f"""
+            <p>{e.message}</p>
+            <p><strong>Current url:</strong> {e.url}</p>
+            <p><strong>Browser logs:</strong> {e.logs}</p>
+            """
+        else:
+            msg = str(excinfo)
+        report_file.write(f'<div class="alert alert-danger">{msg}</div>')
     report_file.write('<div class="text-nowrap">\n')
     for png in pngs:
         report_file.write(f'<img src="data:image/png;base64,{png}">\n')
