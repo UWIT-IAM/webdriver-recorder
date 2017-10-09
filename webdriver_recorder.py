@@ -1,6 +1,8 @@
 import types
 import pytest
 import datetime
+import itertools
+from string import ascii_uppercase
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
@@ -118,16 +120,20 @@ def report_file():
                 <style>
                   img {
                     vertical-align: text-top;
-                    width: 250px;
+                    width: 200px;
+                    border: 2px solid #ddd
                   }
                 </style>
             </head>
             <body>
-                <h1>Results for Identity Signup Scenarios</h1>
+                <h1 class="h4">Results for Identity Signup Scenarios</h1>
         """)
         fd.write(f'<p>Started {starttime}</p>')
         yield fd
         fd.write('</body></html>')
+
+
+TEST_COUNTER = iter(range(1, 10000))
 
 
 @pytest.fixture()
@@ -137,12 +143,15 @@ def report_test(report_file, request, browser):
     Import this into test files that use the browser.
     """
     yield
-
-    report_file.write(f'<h2>{request.node.report_call.report.nodeid}</h2>')
+    testnum = next(TEST_COUNTER)
+    letters = letter_gen()
+    nodeid = request.node.report_call.report.nodeid
+    doc = request.node.report_call.doc or nodeid
+    report_file.write(f'<h2 class="h5">Test #{testnum}: {doc}</h2>')
     pngs = browser.pngs
     browser.pngs = []
-    if request.node.report_call.doc:
-        report_file.write(f'<h3>{request.node.report_call.doc}</p>')
+    if doc != nodeid:
+        report_file.write(f'<h3 class="h6">{nodeid}</p>')
     if request.node.report_call.report.failed:
         excinfo = request.node.report_call.excinfo
         if isinstance(excinfo.value, BrowserError):
@@ -155,9 +164,15 @@ def report_test(report_file, request, browser):
         else:
             msg = str(excinfo)
         report_file.write(f'<div class="alert alert-danger">{msg}</div>')
-    report_file.write('<div class="text-nowrap">\n')
+    report_file.write('<div>\n')
     for png in pngs:
-        report_file.write(f'<img src="data:image/png;base64,{png}">\n')
+        report_file.write(
+            f"""
+            <figure class="figure">
+                <figcaption class="figure-caption text-right">#{testnum}{next(letters)}</figcaption>
+                <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
+            </figure>
+            """)
     report_file.write('</div>\n')
 
 
@@ -175,6 +190,13 @@ def pytest_runtest_makereport(item, call):
             report=report,
             excinfo=call.excinfo,
             doc=doc)
+
+
+def letter_gen():
+    """Return A, B, C, ..., AA, AB, AC, ..., BA, BB, BC, ..."""
+    for repeat in range(1, 10):
+        for item in itertools.product(ascii_uppercase, repeat=repeat):
+            yield ''.join(item)
 
 
 if __name__ == '__main__':
