@@ -28,21 +28,20 @@ def get_browser(
             Find tag containing substring and click it. No wait so it should
             already be in the DOM.
             """
-            search = (By.XPATH, f"//{tag}[contains(.,'{substring}')]")
+            search = (By.XPATH, xpath_contains(f'//{tag}', substring))
             self.find_element(*search).click()
 
         def click_button(self, substring=''):
             """
             Wait for a button with substring to become clickable then click it.
             """
-            search = (By.XPATH,
-                      f"//button[contains(.,'{substring}')]")
+            search = (By.XPATH, xpath_contains(f'//button', substring))
             self.wait.until(EC.element_to_be_clickable(search))
             self.find_element(*search).click()
 
         def wait_for(self, tag, substring):
             """Wait for tag containing substring to show up in the DOM."""
-            search = (By.XPATH, f"//{tag}[contains(.,'{substring}')]")
+            search = (By.XPATH, xpath_contains(f'//{tag}', substring))
             self.wait.until(EC.visibility_of_element_located(search))
 
         def run_commands(self, commands):
@@ -197,6 +196,14 @@ def letter_gen():
     for repeat in range(1, 10):
         for item in itertools.product(ascii_uppercase, repeat=repeat):
             yield ''.join(item)
+
+
+def xpath_contains(node, substring):
+    lc_translate = "translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
+    if "'" in substring:
+        raise ValueError('single quotes in substring not supported')
+    substring = substring.lower()
+    return f"{node}[contains({lc_translate}, '{substring}')]"
 
 
 if __name__ == '__main__':
