@@ -54,7 +54,9 @@ def get_browser(
                 try:
                     getattr(self, method)(*args)
                 except Exception as e:
-                    raise BrowserError(f'failed in {method} with {args}', self)
+                    inner = f'({e.__class__.__name__}: {e})'
+                    msg = f'failed in {method} with {args} {inner}'
+                    raise BrowserError(msg, self)
 
         def snap(self):
             """Grab a screenshot and store it."""
@@ -200,10 +202,10 @@ def letter_gen():
 
 def xpath_contains(node, substring):
     lc_translate = "translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
-    if "'" in substring:
-        raise ValueError('single quotes in substring not supported')
+    if '"' in substring:
+        raise ValueError('double quotes in substring not supported')
     substring = substring.lower()
-    return f"{node}[contains({lc_translate}, '{substring}')]"
+    return f'{node}[contains({lc_translate}, "{substring}")]'
 
 
 if __name__ == '__main__':
