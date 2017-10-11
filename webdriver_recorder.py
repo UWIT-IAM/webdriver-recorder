@@ -23,6 +23,10 @@ def get_browser(
             self.pngs = []  # where to store the screenshots
             self.wait = Waiter(self, default_wait_seconds)
 
+        def clear(self):
+            """Clear the active element."""
+            self.switch_to.active_element.clear()
+
         def click(self, tag, substring=''):
             """
             Find tag containing substring and click it. No wait so it should
