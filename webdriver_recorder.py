@@ -105,7 +105,7 @@ def browser():
     """Keep a PhantomJS browser open while we run our tests."""
     browser = get_browser('node_modules/.bin/phantomjs')
     yield browser
-    browser.close()
+    browser.quit()
 
 
 @pytest.fixture(scope='session')
@@ -217,7 +217,7 @@ if __name__ == '__main__':
     browser.get('https://github.com/UWIT-IAM/webdriver-recorder')
     browser.wait_for('a', 'webdriver-recorder')
     png = browser.pngs.pop()
-    browser.close()
+    browser.quit()
     print('<html><body><h1>Your result</h1>')
     print(f'<img src="data:image/png;base64,{png}">')
     print('</body></html>')
