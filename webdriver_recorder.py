@@ -2,6 +2,7 @@ import types
 import pytest
 import datetime
 import itertools
+import cryptography.fernet
 from string import ascii_uppercase
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -22,6 +23,8 @@ def get_browser(
             self.set_window_size(width=default_width, height=default_height)
             self.pngs = []  # where to store the screenshots
             self.wait = Waiter(self, default_wait_seconds)
+            # optionally set by the caller for decryption in send_secret
+            self.secret_key = None
 
         def clear(self):
             """Clear the active element."""
@@ -73,6 +76,23 @@ def get_browser(
             """
             chain = ActionChains(self)
             chain.send_keys(Keys.TAB.join(strings)).perform()
+
+        def send_secret(self, *encrypted_strings):
+            """
+            Send the list of strings to the window, decrypting them first
+            with self.secret_key.
+            """
+            strings = [self.decrypt(string) for string in encrypted_strings]
+            self.send(*strings)
+
+        def decrypt(self, encrypted_text):
+            """
+            Decrypt an encrypted_text, with self.secret_key, set out of band.
+            """
+            key = self.secret_key
+            cipher_suite = cryptography.fernet.Fernet(key)
+            decrypted_bytes = cipher_suite.decrypt(encrypted_text.encode())
+            return decrypted_bytes.decode()
 
     return BrowserRecorder(*args, **kwargs)
 
