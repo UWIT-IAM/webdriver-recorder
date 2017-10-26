@@ -1,8 +1,22 @@
+"""
+webdriver_recorder provides a browser context and some pytest fixtures
+for the reporting of recorded snapshots.
+
+get_browser - returns a browser context and is completely independent of
+    pytest
+
+pytest fixtures:
+browser - a phantomjs instance of get_browser
+report_file - a fixture for handling the setup and teardown of the webdriver
+   report. This is currently hardwired to write to webdriver-report.html
+report_test - a fixture for reporting on an individual test run.
+"""
 import types
 import pytest
 import datetime
 import itertools
 import cryptography.fernet
+from contextlib import contextmanager
 from string import ascii_uppercase
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -12,12 +26,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
+@contextmanager
 def get_browser(
         *args, driver=webdriver.PhantomJS,
         default_width=400, default_height=800, default_wait_seconds=5,
         **kwargs):
-    """Return an instance of a browser of type driver."""
+    """Return a browser context of type driver."""
     class BrowserRecorder(driver):
+        """
+        A selenium webdriver with some extra convenience utilities and some
+        automatic screenshot capturing.
+        """
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.set_window_size(width=default_width, height=default_height)
@@ -94,7 +113,9 @@ def get_browser(
             decrypted_bytes = cipher_suite.decrypt(encrypted_text.encode())
             return decrypted_bytes.decode()
 
-    return BrowserRecorder(*args, **kwargs)
+    browser = BrowserRecorder(*args, **kwargs)
+    yield browser
+    browser.quit()
 
 
 class Waiter(WebDriverWait):
@@ -123,9 +144,8 @@ class BrowserError(Exception):
 @pytest.fixture(scope='session')
 def browser():
     """Keep a PhantomJS browser open while we run our tests."""
-    browser = get_browser('node_modules/.bin/phantomjs')
-    yield browser
-    browser.quit()
+    with get_browser('node_modules/.bin/phantomjs') as browser:
+        yield browser
 
 
 @pytest.fixture(scope='session')
@@ -233,11 +253,10 @@ def xpath_contains(node, substring):
 
 
 if __name__ == '__main__':
-    browser = get_browser('node_modules/.bin/phantomjs')
-    browser.get('https://github.com/UWIT-IAM/webdriver-recorder')
-    browser.wait_for('a', 'webdriver-recorder')
-    png = browser.pngs.pop()
-    browser.quit()
+    with get_browser('node_modules/.bin/phantomjs') as browser:
+        browser.get('https://github.com/UWIT-IAM/webdriver-recorder')
+        browser.wait_for('a', 'webdriver-recorder')
+        png = browser.pngs.pop()
     print('<html><body><h1>Your result</h1>')
     print(f'<img src="data:image/png;base64,{png}">')
     print('</body></html>')
