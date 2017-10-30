@@ -168,9 +168,12 @@ def report_file():
                     width: 200px;
                     border: 2px solid #ddd
                   }
+                  h2 {
+                    page-break-before: always;
+                  }
                 </style>
             </head>
-            <body>
+            <body style="margin: 20px;">
                 <h1 class="h4">Results for Identity Signup Scenarios</h1>
         """)
         fd.write(f'<p>Started {starttime}</p>')
@@ -209,7 +212,6 @@ def report_test(report_file, request, browser):
         else:
             msg = str(excinfo)
         report_file.write(f'<div class="alert alert-danger">{msg}</div>')
-    report_file.write('<div>\n')
     for png in pngs:
         report_file.write(
             f"""
@@ -218,7 +220,6 @@ def report_test(report_file, request, browser):
                 <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
             </figure>
             """)
-    report_file.write('</div>\n')
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
