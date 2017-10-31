@@ -55,20 +55,23 @@ def get_browser(
             already be in the DOM.
             """
             search = (By.XPATH, xpath_contains(f'//{tag}', substring))
-            self.find_element(*search).click()
+            with self.wrap_exception(f'find tag "{tag}" with string "{substring}"'):
+                self.find_element(*search).click()
 
         def click_button(self, substring=''):
             """
             Wait for a button with substring to become clickable then click it.
             """
             search = (By.XPATH, xpath_contains(f'//button', substring))
-            self.wait.until(EC.element_to_be_clickable(search))
-            self.find_element(*search).click()
+            with self.wrap_exception(f'click button with string "{substring}" when clickable'):
+                self.wait.until(EC.element_to_be_clickable(search))
+                self.find_element(*search).click()
 
         def wait_for(self, tag, substring):
             """Wait for tag containing substring to show up in the DOM."""
             search = (By.XPATH, xpath_contains(f'//{tag}', substring))
-            self.wait.until(EC.visibility_of_element_located(search))
+            with self.wrap_exception(f'wait for visibility of tag "{tag}" with string "{substring}"'):
+                self.wait.until(EC.visibility_of_element_located(search))
 
         def run_commands(self, commands):
             """
@@ -77,12 +80,7 @@ def get_browser(
             pass it.
             """
             for method, *args in commands:
-                try:
-                    getattr(self, method)(*args)
-                except Exception as e:
-                    inner = f'({e.__class__.__name__}: {e})'
-                    msg = f'failed in {method} with {args} {inner}'
-                    raise BrowserError(msg, self)
+                getattr(self, method)(*args)
 
         def snap(self):
             """Grab a screenshot and store it."""
@@ -113,6 +111,14 @@ def get_browser(
             decrypted_bytes = cipher_suite.decrypt(encrypted_text.encode())
             return decrypted_bytes.decode()
 
+        @contextmanager
+        def wrap_exception(self, message):
+            """Wrap any exceptions caught in a BrowserError with message."""
+            try:
+                yield
+            except Exception as e:
+                raise BrowserError(self, message, e)
+
     browser = BrowserRecorder(*args, **kwargs)
     yield browser
     browser.quit()
@@ -134,11 +140,11 @@ class Waiter(WebDriverWait):
 
 class BrowserError(Exception):
     """Error to raise for a meaningful browser error report."""
-    def __init__(self, message, browser):
+    def __init__(self, browser, message, *args):
         self.message = message
         self.url = browser.current_url
         self.logs = browser.get_log('browser')
-        super().__init__(message, self.url, self.logs)
+        super().__init__(message, self.url, self.logs, *args)
 
 
 @pytest.fixture(scope='session')
@@ -204,10 +210,11 @@ def report_test(report_file, request, browser):
         excinfo = request.node.report_call.excinfo
         if isinstance(excinfo.value, BrowserError):
             e = excinfo.value
+            log_lines = map(lambda data: data.get('message', ''), e.logs)
             msg = f"""
-            <p>{e.message}</p>
+            <p><strong>The following action failed:</strong> {e.message}</p>
             <p><strong>Current url:</strong> {e.url}</p>
-            <p><strong>Browser logs:</strong> {e.logs}</p>
+            <p><strong>Browser logs:</strong> {'<br>'.join(log_lines)}</p>
             """
         else:
             msg = str(excinfo)
