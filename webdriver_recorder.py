@@ -15,6 +15,7 @@ import types
 import pytest
 import datetime
 import itertools
+import json
 import cryptography.fernet
 from contextlib import contextmanager
 from string import ascii_uppercase
@@ -177,10 +178,14 @@ def report_file():
                   h2 {
                     page-break-before: always;
                   }
+                  .nav-link {
+                    padding: 0
+                  }
                 </style>
             </head>
             <body style="margin: 20px;">
                 <h1 class="h4">Results for Identity Signup Scenarios</h1>
+                <nav class="nav flex-column"></nav>
         """)
         fd.write(f'<p>Started {starttime}</p>')
         yield fd
@@ -191,7 +196,7 @@ TEST_COUNTER = iter(range(1, 10000))
 
 
 @pytest.fixture()
-def report_test(report_file, request, browser):
+def report_test(report_file, report_links, request, browser):
     """
     Print the results to report_file after a test run.
     Import this into test files that use the browser.
@@ -201,11 +206,12 @@ def report_test(report_file, request, browser):
     letters = letter_gen()
     nodeid = request.node.report_call.report.nodeid
     doc = request.node.report_call.doc or nodeid
-    report_file.write(f'<h2 class="h5">Test #{testnum}: {doc}</h2>')
+    report_links.append(nodeid)
+    report_file.write(f'<h2 class="h5"><a name="{testnum}">Test #{testnum}</a>: {doc}</h2>')
     pngs = browser.pngs
     browser.pngs = []
     if doc != nodeid:
-        report_file.write(f'<h3 class="h6">{nodeid}</p>')
+        report_file.write(f'<h3 class="h6">{nodeid}</p></h3>')
     if request.node.report_call.report.failed:
         excinfo = request.node.report_call.excinfo
         if isinstance(excinfo.value, BrowserError):
@@ -227,6 +233,34 @@ def report_test(report_file, request, browser):
                 <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
             </figure>
             """)
+
+
+@pytest.fixture(scope="session")
+def report_links(report_file):
+    """
+    A fixture that gets appended it for every test that gets run to generate a
+    table of contents. Each test appends its title, and we generate links from
+    that. The link is of the form "#1" and the report_links list is 1-indexed.
+    """
+    content_titles = []
+    yield content_titles
+    links = []
+    for index, title in enumerate(content_titles, start=1):
+        links.append(dict(link=index, title=title))
+    links_json = json.dumps(links)
+
+    # We know this after all the tests are run. Here's a little javascript
+    # that'll append it to the <nav> element at the top.
+    report_file.write("""
+        <script>
+            $(document).ready(() => {
+                let links = []
+                let navs = JSON.parse('""" + links_json + """');
+                navs.forEach(nav => links.push(`<a class="nav-link" href="#${nav.link}">Test #${nav.link} - ${nav.title}</a>`));
+                $('nav').append(links.join(''));
+            });
+        </script>
+        """)
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
