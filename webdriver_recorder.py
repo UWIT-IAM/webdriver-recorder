@@ -206,7 +206,7 @@ def report_test(report_file, report_links, request, browser):
     letters = letter_gen()
     nodeid = request.node.report_call.report.nodeid
     doc = request.node.report_call.doc or nodeid
-    report_links.append(nodeid)
+    report_links.append(dict(name=nodeid, failed=request.node.report_call.report.failed))
     report_file.write(f'<h2 class="h5"><a name="{testnum}">Test #{testnum}</a>: {doc}</h2>')
     pngs = browser.pngs
     browser.pngs = []
@@ -242,11 +242,11 @@ def report_links(report_file):
     table of contents. Each test appends its title, and we generate links from
     that. The link is of the form "#1" and the report_links list is 1-indexed.
     """
-    content_titles = []
-    yield content_titles
+    test_results = []
+    yield test_results
     links = []
-    for index, title in enumerate(content_titles, start=1):
-        links.append(dict(link=index, title=title))
+    for index, result in enumerate(test_results, start=1):
+        links.append(dict(link=index, title=result['name'], failed=result['failed']))
     links_json = json.dumps(links)
 
     # We know this after all the tests are run. Here's a little javascript
@@ -254,10 +254,14 @@ def report_links(report_file):
     report_file.write("""
         <script>
             $(document).ready(() => {
-                let links = []
-                let navs = JSON.parse('""" + links_json + """');
-                navs.forEach(nav => links.push(`<a class="nav-link" href="#${nav.link}">Test #${nav.link} - ${nav.title}</a>`));
-                $('nav').append(links.join(''));
+                let navs = """ + links_json + """;
+                let mapToLink = nav => {
+                    let linkText = `Test #${nav.link} - ${nav.title}`;
+                    if(nav.failed)
+                        linkText += ' - <span class="text-danger">FAILED</span>';
+                    return `<a class="nav-link" href="#${nav.link}">${linkText}</a>`;
+                }
+                $('nav').append(navs.map(mapToLink).join(''));
             });
         </script>
         """)
