@@ -45,6 +45,14 @@ def get_browser(
             self.wait = Waiter(self, default_wait_seconds)
             # optionally set by the caller for decryption in send_secret
             self.secret_key = None
+            self.autocapture = True   # automatically capture screenshots
+
+        @contextmanager
+        def autocapture_off(self):
+            """Context manager temporarily disabling automatic screenshot generation."""
+            self.autocapture = False
+            yield
+            self.autocapture = True
 
         def clear(self):
             """Clear the active element."""
@@ -118,6 +126,8 @@ def get_browser(
             try:
                 yield
             except Exception as e:
+                if not self.autocapture:
+                    self.snap()
                 raise BrowserError(self, message, e)
 
     browser = BrowserRecorder(*args, **kwargs)
@@ -136,7 +146,8 @@ class Waiter(WebDriverWait):
         try:
             super().until(*arg, **kwargs)
         finally:
-            self.__driver.snap()
+            if self.__driver.autocapture:
+                self.__driver.snap()
 
 
 class BrowserError(Exception):
