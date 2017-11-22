@@ -103,6 +103,11 @@ def get_browser(
             chain = ActionChains(self)
             chain.send_keys(Keys.TAB.join(strings)).perform()
 
+        def send_inputs(self, *strings):
+            elements = self.find_elements_by_css_selector('input')
+            for element, string in zip(elements, strings):
+                element.send_keys(string)
+
         def send_secret(self, *encrypted_strings):
             """
             Send the list of strings to the window, decrypting them first
