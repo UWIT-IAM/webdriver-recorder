@@ -30,7 +30,7 @@ from selenium.webdriver.support import expected_conditions as EC
 @contextmanager
 def get_browser(
         *args, driver=webdriver.PhantomJS,
-        default_width=400, default_height=800, default_wait_seconds=5,
+        default_width=400, default_height=200, default_wait_seconds=5,
         **kwargs):
     """Return a browser context of type driver."""
     class BrowserRecorder(driver):
@@ -50,9 +50,10 @@ def get_browser(
         @contextmanager
         def autocapture_off(self):
             """Context manager temporarily disabling automatic screenshot generation."""
+            previous_autocapture = self.autocapture  # for nesting
             self.autocapture = False
             yield
-            self.autocapture = True
+            self.autocapture = previous_autocapture
 
         def clear(self):
             """Clear the active element."""
