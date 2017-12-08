@@ -59,13 +59,15 @@ def get_browser(
             """Clear the active element."""
             self.switch_to.active_element.clear()
 
-        def click(self, tag, substring=''):
+        def click(self, tag, substring='', wait=True):
             """
-            Find tag containing substring and click it. No wait so it should
-            already be in the DOM.
+            Find tag containing substring and click it.
+            wait - give it time to show up in the DOM.
             """
             search = (By.XPATH, xpath_contains(f'//{tag}', substring))
             with self.wrap_exception(f'find tag "{tag}" with string "{substring}"'):
+                if wait:
+                    self.wait.until(EC.element_to_be_clickable(search))
                 self.find_element(*search).click()
 
         def click_button(self, substring=''):
