@@ -15,6 +15,7 @@ import types
 import pytest
 import datetime
 import itertools
+import html
 import json
 import cryptography.fernet
 from contextlib import contextmanager
@@ -235,7 +236,8 @@ def report_test(report_file, report_links, request, browser):
         excinfo = request.node.report_call.excinfo
         if isinstance(excinfo.value, BrowserError):
             e = excinfo.value
-            log_lines = map(lambda data: data.get('message', ''), e.logs)
+            log_lines = map(lambda data: html.escape(data.get('message', '')),
+                            e.logs)
             msg = f"""
             <p><strong>The following action failed:</strong> {e.message}</p>
             <p><strong>Current url:</strong> {e.url}</p>
