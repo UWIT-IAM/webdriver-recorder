@@ -53,8 +53,10 @@ def get_browser(
             """Context manager temporarily disabling automatic screenshot generation."""
             previous_autocapture = self.autocapture  # for nesting
             self.autocapture = False
-            yield
-            self.autocapture = previous_autocapture
+            try:
+                yield
+            finally:
+                self.autocapture = previous_autocapture
 
         def clear(self):
             """Clear the active element."""
