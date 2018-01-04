@@ -10,8 +10,21 @@ npm install phantomjs-prebuilt
 ```
 
 ## Running it
+Assume the following file:
+
+```python
+"""test_42.py"""
+
+
+def test_42(browser, report_test):
+    """Check the answer."""
+    browser.get('https://en.wikipedia.org/wiki/42_(number)')
+    browser.wait_for('body', 'life, the universe, and everything')
 ```
-from webdriver_recorder import get_browser
-browser = get_browser('node_modules/.bin/phantomjs')
-browser.get('https://www.wikipedia.org')
+
+You would then run the test with
+```bash
+pytest
 ```
+When the test completes, you will have file `webdriver-report.html`, with a
+screenshot for every `wait_for()` in your test.
