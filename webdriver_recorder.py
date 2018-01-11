@@ -114,6 +114,11 @@ def get_browser(
             for element, string in zip(elements, strings):
                 element.send_keys(string)
 
+        def hide_inputs(self):
+            """Obscure all text inputs on the current screen."""
+            javascript = "$('input[type=\"text\"]').attr('type', 'password')"
+            self.execute_script(javascript)
+
         def send_secret(self, *encrypted_strings):
             """
             Send the list of strings to the window, decrypting them first
