@@ -17,6 +17,7 @@ import datetime
 import itertools
 import html
 import json
+import time
 import cryptography.fernet
 from contextlib import contextmanager
 from string import ascii_uppercase
@@ -31,8 +32,7 @@ from selenium.webdriver.support import expected_conditions as EC
 @contextmanager
 def get_browser(
         *args, driver=webdriver.PhantomJS,
-        default_width=400, default_height=200, default_wait_seconds=5,
-        **kwargs):
+        default_width=400, default_height=200, **kwargs):
     """Return a browser context of type driver."""
     class BrowserRecorder(driver):
         """
@@ -43,7 +43,6 @@ def get_browser(
             super().__init__(*args, **kwargs)
             self.set_window_size(width=default_width, height=default_height)
             self.pngs = []  # where to store the screenshots
-            self.wait = Waiter(self, default_wait_seconds)
             # optionally set by the caller for decryption in send_secret
             self.secret_key = None
             self.autocapture = True   # automatically capture screenshots
@@ -62,15 +61,17 @@ def get_browser(
             """Clear the active element."""
             self.switch_to.active_element.clear()
 
-        def click(self, tag, substring='', wait=True):
+        def click(self, tag, substring='', wait=True, timeout=5, capture_delay=0):
             """
             Find tag containing substring and click it.
             wait - give it time to show up in the DOM.
             """
             search = (By.XPATH, xpath_contains(f'//{tag}', substring))
             with self.wrap_exception(f'find tag "{tag}" with string "{substring}"'):
-                if wait:
-                    self.wait.until(EC.element_to_be_clickable(search))
+                if wait and timeout:
+                    wait = Waiter(self, timeout)
+                    wait.until(EC.element_to_be_clickable(search),
+                               capture_delay=capture_delay)
                 self.find_element(*search).click()
 
         def click_button(self, substring=''):
@@ -79,14 +80,17 @@ def get_browser(
             """
             search = (By.XPATH, xpath_contains(f'//button', substring))
             with self.wrap_exception(f'click button with string "{substring}" when clickable'):
-                self.wait.until(EC.element_to_be_clickable(search))
+                wait = Waiter(self, 5)
+                wait.until(EC.element_to_be_clickable(search))
                 self.find_element(*search).click()
 
-        def wait_for(self, tag, substring):
+        def wait_for(self, tag, substring, timeout=5, capture_delay=0):
             """Wait for tag containing substring to show up in the DOM."""
             search = (By.XPATH, xpath_contains(f'//{tag}', substring))
             with self.wrap_exception(f'wait for visibility of tag "{tag}" with string "{substring}"'):
-                self.wait.until(EC.visibility_of_element_located(search))
+                wait = Waiter(self, timeout)
+                wait.until(EC.visibility_of_element_located(search),
+                           capture_delay=capture_delay)
 
         def run_commands(self, commands):
             """
@@ -116,7 +120,10 @@ def get_browser(
 
         def hide_inputs(self):
             """Obscure all text inputs on the current screen."""
-            javascript = "$('input[type=\"text\"]').attr('type', 'password')"
+            javascript = """
+                $('input[type=text]').attr('type', 'password');
+                $('input:not([type])').attr('type', 'password');
+            """
             self.execute_script(javascript)
 
         def send_secret(self, *encrypted_strings):
@@ -153,16 +160,22 @@ def get_browser(
 
 class Waiter(WebDriverWait):
     """Custom WebDriverWait object that grabs a screenshot after every wait."""
-    def __init__(self, driver, *args, **kwargs):
-        super().__init__(driver, *args, **kwargs)
+    def __init__(self, driver, timeout, *args, **kwargs):
+        super().__init__(driver, timeout, *args, **kwargs)
         self.__driver = driver
 
-    def until(self, *arg, **kwargs):
-        """Every time we wait, take a screenshot of the outcome."""
+    def until(self, *arg, capture_delay=0, **kwargs):
+        """
+        Every time we wait, take a screenshot of the outcome.
+        capture_delay - when we're done waiting, wait just  a little longer
+          for whatever animations to take effect.
+        """
         try:
             super().until(*arg, **kwargs)
         finally:
             if self.__driver.autocapture:
+                if capture_delay:
+                    time.sleep(capture_delay)
                 self.__driver.snap()
 
 
