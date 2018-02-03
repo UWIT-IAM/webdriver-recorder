@@ -154,8 +154,10 @@ def get_browser(
                 raise BrowserError(self, message, e)
 
     browser = BrowserRecorder(*args, **kwargs)
-    yield browser
-    browser.quit()
+    try:
+        yield browser
+    finally:
+        browser.quit()
 
 
 class Waiter(WebDriverWait):
