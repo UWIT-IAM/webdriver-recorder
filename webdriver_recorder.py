@@ -80,12 +80,14 @@ def get_browser(
             """
             search = (By.XPATH, xpath_contains(f'//button', substring))
             with self.wrap_exception(f'click button with string "{substring}" when clickable'):
-                wait = Waiter(self, 5)
+                wait = Waiter(self, getattr(self, 'default_wait', 5))
                 wait.until(EC.element_to_be_clickable(search))
                 self.find_element(*search).click()
 
-        def wait_for(self, tag, substring, timeout=5, capture_delay=0):
+        def wait_for(self, tag, substring, timeout=None, capture_delay=0):
             """Wait for tag containing substring to show up in the DOM."""
+            if timeout is None:
+                timeout = getattr(self, 'default_wait', 5)
             search = (By.XPATH, xpath_contains(f'//{tag}', substring))
             with self.wrap_exception(f'wait for visibility of tag "{tag}" with string "{substring}"'):
                 wait = Waiter(self, timeout)
