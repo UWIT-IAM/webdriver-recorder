@@ -18,7 +18,6 @@ import itertools
 import html
 import json
 import time
-import cryptography.fernet
 from contextlib import contextmanager
 from string import ascii_uppercase
 from selenium import webdriver
@@ -44,7 +43,6 @@ def get_browser(
             self.set_window_size(width=default_width, height=default_height)
             self.pngs = []  # where to store the screenshots
             # optionally set by the caller for decryption in send_secret
-            self.secret_key = None
             self.autocapture = True   # automatically capture screenshots
 
         @contextmanager
@@ -130,20 +128,16 @@ def get_browser(
 
         def send_secret(self, *encrypted_strings):
             """
-            Send the list of strings to the window, decrypting them first
-            with self.secret_key.
+            Send the list of strings to the window, decrypting them first.
+            We do this encrypted to keep the secrets from appearing in
+            Tracebacks.
             """
             strings = [self.decrypt(string) for string in encrypted_strings]
             self.send(*strings)
 
         def decrypt(self, encrypted_text):
-            """
-            Decrypt an encrypted_text, with self.secret_key, set out of band.
-            """
-            key = self.secret_key
-            cipher_suite = cryptography.fernet.Fernet(key)
-            decrypted_bytes = cipher_suite.decrypt(encrypted_text.encode())
-            return decrypted_bytes.decode()
+            """Method to decrypt text to be overridden."""
+            raise NotImplementedError('decrypt should be overridden')
 
         @contextmanager
         def wrap_exception(self, message):

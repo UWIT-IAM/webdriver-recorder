@@ -1,3 +1,2 @@
 selenium
 pytest
-cryptography
