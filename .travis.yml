@@ -1,0 +1,11 @@
+language: python
+python:
+  - "3.6"
+node_js: "node"
+install:
+  - pip install -U pip setuptools
+  - pip install python-coveralls coverage
+  - npm install phantomjs-prebuilt
+script:
+  - coverage run --source=. --omit='.eggs/*' setup.py test
+  - coveralls
