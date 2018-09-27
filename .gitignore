@@ -5,3 +5,6 @@ ghostdriver.log
 *.egg-info
 __pycache__
 .vscode
+.cache
+.eggs
+package-lock.json
