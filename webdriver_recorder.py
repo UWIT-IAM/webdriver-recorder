@@ -272,6 +272,8 @@ def report_test(report_file, report_links, request, browser):
                 <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
             </figure>
             """)
+        import time
+        time.sleep(.5)
 
 
 @pytest.fixture(scope="session")
