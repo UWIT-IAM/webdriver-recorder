@@ -147,7 +147,7 @@ def get_browser(
             except Exception as e:
                 if not self.autocapture:
                     self.snap()
-                raise BrowserError(self, message, e)
+                raise BrowserError(self, message, str(e))
 
     browser = BrowserRecorder(*args, **kwargs)
     try:
