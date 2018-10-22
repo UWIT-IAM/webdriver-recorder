@@ -121,8 +121,11 @@ def get_browser(
         def hide_inputs(self):
             """Obscure all text inputs on the current screen."""
             javascript = """
-                $('input[type=text]').attr('type', 'password');
-                $('input:not([type])').attr('type', 'password');
+                var inputsToHide = document.querySelectorAll('input');
+                Array.prototype.forEach.call(inputsToHide, function(el){
+                    if (!el.attributes['type'] || el.attributes['type'].value === 'text')
+                        el.setAttribute('type', 'password');
+                })
             """
             self.execute_script(javascript)
 
