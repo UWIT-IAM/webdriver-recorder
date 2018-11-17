@@ -19,7 +19,8 @@ import itertools
 import html
 import json
 import time
-from contextlib import contextmanager
+import tempfile
+from contextlib import contextmanager, suppress
 from string import ascii_uppercase
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -198,116 +199,70 @@ def browser():
 
 
 @pytest.fixture(scope='session')
-def report_file():
+def report_dir():
     """Open file webdriver-report.html during our test runs."""
     starttime = datetime.datetime.now()
-    with open('webdriver-report.html', mode='w') as fd:
-        fd.write("""
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>Identity Signup Storyboard</title>
-                <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
-                <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
-                <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
-                <style>
-                  img {
-                    vertical-align: text-top;
-                    width: 200px;
-                    border: 2px solid #ddd
-                  }
-                  h2 {
-                    page-break-before: always;
-                  }
-                  .nav-link {
-                    padding: 0
-                  }
-                </style>
-            </head>
-            <body style="margin: 20px;">
-                <h1 class="h4">Results for Identity Signup Scenarios</h1>
-                <nav class="nav flex-column"></nav>
-        """)
-        fd.write(f'<p>Started {starttime}</p>')
-        yield fd
-        fd.write('</body></html>')
 
-
-TEST_COUNTER = iter(range(1, 10000))
+    tempdir = os.path.join(os.getcwd(), 'webdriver_report')
+    with suppress(FileExistsError):
+        os.mkdir(tempdir)
+    _, worker_file = tempfile.mkstemp(prefix='worker.', dir=tempdir)
+    yield tempdir
+    os.remove(worker_file)
+    worker_files = (f for f in os.listdir(tempdir) if f.startswith('worker.'))
+    if not any(worker_files):
+        generate_report(tempdir)
 
 
 @pytest.fixture()
-def report_test(report_file, report_links, request, browser):
+def report_test(report_dir, request, browser):
     """
     Print the results to report_file after a test run.
     Import this into test files that use the browser.
     """
     yield
-    testnum = next(TEST_COUNTER)
     letters = letter_gen()
     nodeid = request.node.report_call.report.nodeid
+    is_failed = request.node.report_call.report.failed
     doc = request.node.report_call.doc or nodeid
-    report_links.append(dict(name=nodeid, failed=request.node.report_call.report.failed))
-    report_file.write(f'<h2 class="h5"><a name="{testnum}">Test #{testnum}</a>: {doc}</h2>')
-    pngs = browser.pngs
-    browser.pngs = []
-    if doc != nodeid:
-        report_file.write(f'<h3 class="h6">{nodeid}</p></h3>')
-    if request.node.report_call.report.failed:
-        excinfo = request.node.report_call.excinfo
-        if isinstance(excinfo.value, BrowserError):
-            e = excinfo.value
-            log_lines = map(lambda data: html.escape(data.get('message', '')),
-                            e.logs)
-            msg = f"""
-            <p><strong>The following action failed:</strong> {e.message}</p>
-            <p><strong>Current url:</strong> {e.url}</p>
-            <p><strong>Browser logs:</strong> {'<br>'.join(log_lines)}</p>
-            """
-        else:
-            msg = str(excinfo)
-        report_file.write(f'<div class="alert alert-danger">{msg}</div>')
-    for png in pngs:
-        report_file.write(
-            f"""
-            <figure class="figure">
-                <figcaption class="figure-caption text-right">#{testnum}{next(letters)}</figcaption>
-                <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
-            </figure>
-            """)
+    stamp = time.time()
+    seq = len([f for f in os.listdir(report_dir) if f.startswith('tmp')]) + 1
+    filename = os.path.join(report_dir, f'tmp.{stamp}.html')
+    header = os.path.join(report_dir, f'head.{stamp}.html')
+    with open(filename, 'w') as fd:
+        fd.write(f'<h2 class="h5"><a name="{stamp}">Test #{seq}</a>: {doc}</h2>')
+        pngs = browser.pngs
+        browser.pngs = []
+        if doc != nodeid:
+            fd.write(f'<h3 class="h6">{nodeid}</p></h3>')
+        if is_failed:
+            excinfo = request.node.report_call.excinfo
+            if isinstance(excinfo.value, BrowserError):
+                e = excinfo.value
+                log_lines = map(lambda data: html.escape(data.get('message', '')),
+                                e.logs)
+                msg = f"""
+                <p><strong>The following action failed:</strong> {e.message}</p>
+                <p><strong>Current url:</strong> {e.url}</p>
+                <p><strong>Browser logs:</strong> {'<br>'.join(log_lines)}</p>
+                """
+            else:
+                msg = str(excinfo)
+            fd.write(f'<div class="alert alert-danger">{msg}</div>')
+        for png in pngs:
+            fd.write(
+                f"""
+                <figure class="figure">
+                    <figcaption class="figure-caption text-right">#{seq}{next(letters)}</figcaption>
+                    <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
+                </figure>
+                """)
 
-
-@pytest.fixture(scope="session")
-def report_links(report_file):
-    """
-    A fixture that gets appended it for every test that gets run to generate a
-    table of contents. Each test appends its title, and we generate links from
-    that. The link is of the form "#1" and the report_links list is 1-indexed.
-    """
-    test_results = []
-    yield test_results
-    links = []
-    for index, result in enumerate(test_results, start=1):
-        links.append(dict(link=index, title=result['name'], failed=result['failed']))
-    links_json = json.dumps(links)
-
-    # We know this after all the tests are run. Here's a little javascript
-    # that'll append it to the <nav> element at the top.
-    report_file.write("""
-        <script>
-            $(document).ready(() => {
-                let navs = """ + links_json + """;
-                let mapToLink = nav => {
-                    let linkText = `Test #${nav.link} - ${nav.title}`;
-                    if(nav.failed)
-                        linkText += ' - <span class="text-danger">FAILED</span>';
-                    return `<a class="nav-link" href="#${nav.link}">${linkText}</a>`;
-                }
-                $('nav').append(navs.map(mapToLink).join(''));
-            });
-        </script>
-        """)
+    summary = f'Test #{seq} - {nodeid}'
+    if is_failed:
+        summary += '- <span class="text-danger">FAILED</span>'
+    with open(header, 'w') as fd:
+        fd.write(f'<a class="nav-link" href="#{stamp}">{summary}</a>')
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -339,6 +294,54 @@ def xpath_contains(node, substring):
         raise ValueError('double quotes in substring not supported')
     substring = substring.lower()
     return f'{node}[contains({lc_translate}, "{substring}")]'
+
+
+def generate_report(report_dir):
+    with open('webdriver-report.html', mode='w') as fd:
+        fd.write("""
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>Identity Signup Storyboard</title>
+                <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+                <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
+                <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
+                <style>
+                  img {
+                    vertical-align: text-top;
+                    width: 200px;
+                    border: 2px solid #ddd
+                  }
+                  h2 {
+                    page-break-before: always;
+                  }
+                  .nav-link {
+                    padding: 0
+                  }
+                </style>
+            </head>
+            <body style="margin: 20px;">
+                <h1 class="h4">Results for Identity Signup Scenarios</h1>
+        """)
+
+        fd.write('<nav class="nav flex-column">')
+        heads = (f for f in os.listdir(report_dir) if f.startswith('head.'))
+        for head in sorted(heads):
+            head_file = os.path.join(report_dir, head)
+            with open(head_file) as readfd:
+                fd.write(readfd.read())
+            os.remove(head_file)
+        fd.write('</nav>')
+
+        tmps = (f for f in os.listdir(report_dir) if f.startswith('tmp.'))
+        for filename in sorted(tmps):
+            filename = os.path.join(report_dir, filename)
+            with open(filename) as readfd:
+                fd.write(readfd.read())
+            os.remove(filename)
+
+        fd.write('</body></html>')
 
 
 if __name__ == '__main__':
