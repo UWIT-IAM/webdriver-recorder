@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='webdriver-recorder',
-      install_requires=['selenium', 'pytest'],
+      install_requires=['selenium', 'pytest', 'jinja2'],
       version='0.4',
       description=(
           'Enhances a selenium webdriver to record screenshots along the way'),
