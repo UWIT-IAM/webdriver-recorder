@@ -1,38 +1,16 @@
 """
-webdriver_recorder provides a browser context and some pytest fixtures
-for the reporting of recorded snapshots.
-
-get_browser - returns a browser context and is completely independent of
-    pytest
-
-pytest fixtures:
-browser - a phantomjs instance of get_browser
-report_file - a fixture for handling the setup and teardown of the webdriver
-   report. This is currently hardwired to write to webdriver-report.html
-report_test - a fixture for reporting on an individual test run.
+BrowserRecorder class for recording snapshots between waits.
 """
 import os
-import re
-import types
-import pytest
-import datetime
-import itertools
-import html
-import json
 import time
-import tempfile
-from contextlib import contextmanager, suppress
-from string import ascii_uppercase
+from contextlib import contextmanager
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import jinja2
 
-TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                             'report.template.html')
 
 class BrowserRecorder(webdriver.PhantomJS):
     """
@@ -195,125 +173,12 @@ class BrowserError(Exception):
         super().__init__(message, self.url, self.logs, *args)
 
 
-@pytest.fixture(scope='session')
-def browser():
-    """Keep a PhantomJS browser open while we run our tests."""
-    with BrowserRecorder() as browser:
-        yield browser
-
-
-@pytest.fixture(scope='session')
-def report_dir():
-    """Fixture returning the directory containing our report files."""
-    tempdir = os.path.join(os.getcwd(), 'webdriver-report')
-    with suppress(FileExistsError):
-        os.mkdir(tempdir)
-    _, worker_file = tempfile.mkstemp(prefix='worker.', dir=tempdir)
-    yield tempdir
-    os.remove(worker_file)
-    worker_files = (f for f in os.listdir(tempdir) if f.startswith('worker.'))
-    if not any(worker_files):
-        generate_report(tempdir)
-
-
-@pytest.fixture()
-def report_test(report_dir, request, browser):
-    """
-    Print the results to report_file after a test run.
-    Import this into test files that use the browser.
-    """
-    yield
-    nodeid = request.node.report_call.report.nodeid
-    is_failed = request.node.report_call.report.failed
-    doc = request.node.report_call.doc
-    slug = re.sub(r'\W', '-', nodeid)
-    header = {'link': slug, 'is_failed': is_failed, 'description': nodeid}
-    failure = None
-    if is_failed:
-        excinfo = request.node.report_call.excinfo
-        if isinstance(excinfo.value, BrowserError):
-            e = excinfo.value
-            failure = {
-                'message': e.message,
-                'url': e.url,
-                'loglines': [log.get('message', '') for log in e.logs]
-            }
-        else:
-            failure = {'message': str(excinfo)}
-    result = {
-        'link': slug,
-        'doc': doc,
-        'nodeid': nodeid,
-        'pngs': browser.pngs,
-        'failure': failure
-    }
-
-    filename = os.path.join(report_dir, f'result.{slug}.html')
-    headerfile = os.path.join(report_dir, f'head.{slug}.html')
-    with open(headerfile, 'w') as fd:
-        json.dump(header, fd)
-    with open(filename, 'w') as fd:
-        json.dump(result, fd)
-    browser.pngs = []  # clear the stored screenshots
-
-
-@pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    """
-    This gives us hooks from which to report status post test-run.
-    Import this into your conftest.py.
-    """
-    outcome = yield
-    report = outcome.get_result()
-    if report.when == 'call':
-        doc = getattr(getattr(item, 'function', None), '__doc__', None)
-        item.report_call = types.SimpleNamespace(
-            report=report,
-            excinfo=call.excinfo,
-            doc=doc)
-
-
-def lettergen():
-    """Return A, B, C, ..., AA, AB, AC, ..., BA, BB, BC, ..."""
-    for repeat in range(1, 10):
-        for item in itertools.product(ascii_uppercase, repeat=repeat):
-            yield ''.join(item)
-
-
 def xpath_contains(node, substring):
     lc_translate = "translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
     if '"' in substring:
         raise ValueError('double quotes in substring not supported')
     substring = substring.lower()
     return f'{node}[contains({lc_translate}, "{substring}")]'
-
-
-def generate_report(report_dir, project='Identity.UW'):
-    with open(TEMPLATE_FILE) as fd:
-        template = jinja2.Template(fd.read())
-    template.globals.update({
-        'date': str(datetime.datetime.now()),
-        'lettergen': lettergen,
-        'zip': zip
-    })
-    headers = iterfiles(report_dir, 'head.')
-    results = iterfiles(report_dir, 'result.')
-    stream = template.stream(headers=headers, results=results, project=project)
-    stream.dump(os.path.join(report_dir, 'index.html'))
-
-
-def iterfiles(dir, prefix):
-    """
-    Iterate through the objects contained in files starting with prefix.
-    Delete afterwards.
-    """
-    files = (f for f in os.listdir(dir) if f.startswith(prefix))
-    for filename in sorted(files):
-        filename = os.path.join(dir, filename)
-        with open(filename) as fd:
-            data = json.load(fd)
-            os.remove(filename)
-            yield data
 
 
 if __name__ == '__main__':
