@@ -3,13 +3,14 @@ python:
   - '3.6'
 node_js: node
 install:
-  - git describe --tags > VERSION
+  - git describe --tags > webdriver_recorder/VERSION
   - pip install -U pip setuptools
   - pip install python-coveralls coverage
   - npm install phantomjs-prebuilt
 script:
   - coverage run --source=. --omit='.eggs/*' setup.py test
   - coveralls
+before_deploy:
 deploy:
   skip_cleanup: true
   provider: pypi

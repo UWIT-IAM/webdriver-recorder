@@ -11,4 +11,3 @@ build
 dist
 package-lock.json
 webdriver-report
-VERSION
