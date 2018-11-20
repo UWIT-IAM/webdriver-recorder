@@ -11,4 +11,4 @@ build
 dist
 package-lock.json
 webdriver-report
-webdriver_recorder/_version.py
+VERSION
