@@ -13,7 +13,6 @@ import re
 import tempfile
 import itertools
 import json
-import types
 from contextlib import suppress
 from string import ascii_uppercase
 import datetime
@@ -103,7 +102,7 @@ def pytest_runtest_makereport(item, call):
     report = outcome.get_result()
     if report.when == 'call':
         doc = getattr(getattr(item, 'function', None), '__doc__', None)
-        item.report_call = types.SimpleNamespace(
+        item.report_call = ReportResult(
             report=report,
             excinfo=call.excinfo,
             doc=doc)
@@ -142,3 +141,16 @@ def iterfiles(dir, prefix):
             data = json.load(fd)
             os.remove(filename)
             yield data
+
+
+class ReportResult(object):
+    """
+    A test result for passing to the report_test fixture.
+    report -- a pytest test outcome
+    excinfo -- exception info if there is any
+    doc -- the docstring for the test if there is any
+    """
+    def __init__(self, report, excinfo, doc):
+        self.report = report
+        self.excinfo = excinfo,
+        self.doc = doc
