@@ -12,6 +12,7 @@ report_file - a fixture for handling the setup and teardown of the webdriver
 report_test - a fixture for reporting on an individual test run.
 """
 import os
+import re
 import types
 import pytest
 import datetime
@@ -28,7 +29,10 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import jinja2
 
+TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                             'report.template.html')
 
 class BrowserRecorder(webdriver.PhantomJS):
     """
@@ -200,10 +204,8 @@ def browser():
 
 @pytest.fixture(scope='session')
 def report_dir():
-    """Open file webdriver-report.html during our test runs."""
-    starttime = datetime.datetime.now()
-
-    tempdir = os.path.join(os.getcwd(), 'webdriver_report')
+    """Fixture returning the directory containing our report files."""
+    tempdir = os.path.join(os.getcwd(), 'webdriver-report')
     with suppress(FileExistsError):
         os.mkdir(tempdir)
     _, worker_file = tempfile.mkstemp(prefix='worker.', dir=tempdir)
@@ -221,48 +223,38 @@ def report_test(report_dir, request, browser):
     Import this into test files that use the browser.
     """
     yield
-    letters = letter_gen()
     nodeid = request.node.report_call.report.nodeid
     is_failed = request.node.report_call.report.failed
-    doc = request.node.report_call.doc or nodeid
-    stamp = time.time()
-    seq = len([f for f in os.listdir(report_dir) if f.startswith('tmp')]) + 1
-    filename = os.path.join(report_dir, f'tmp.{stamp}.html')
-    header = os.path.join(report_dir, f'head.{stamp}.html')
-    with open(filename, 'w') as fd:
-        fd.write(f'<h2 class="h5"><a name="{stamp}">Test #{seq}</a>: {doc}</h2>')
-        pngs = browser.pngs
-        browser.pngs = []
-        if doc != nodeid:
-            fd.write(f'<h3 class="h6">{nodeid}</p></h3>')
-        if is_failed:
-            excinfo = request.node.report_call.excinfo
-            if isinstance(excinfo.value, BrowserError):
-                e = excinfo.value
-                log_lines = map(lambda data: html.escape(data.get('message', '')),
-                                e.logs)
-                msg = f"""
-                <p><strong>The following action failed:</strong> {e.message}</p>
-                <p><strong>Current url:</strong> {e.url}</p>
-                <p><strong>Browser logs:</strong> {'<br>'.join(log_lines)}</p>
-                """
-            else:
-                msg = str(excinfo)
-            fd.write(f'<div class="alert alert-danger">{msg}</div>')
-        for png in pngs:
-            fd.write(
-                f"""
-                <figure class="figure">
-                    <figcaption class="figure-caption text-right">#{seq}{next(letters)}</figcaption>
-                    <img src="data:image/png;base64,{png}" class="figure-img img-fluid">
-                </figure>
-                """)
-
-    summary = f'Test #{seq} - {nodeid}'
+    doc = request.node.report_call.doc
+    slug = re.sub(r'\W', '-', nodeid)
+    header = {'link': slug, 'is_failed': is_failed, 'description': nodeid}
+    failure = None
     if is_failed:
-        summary += '- <span class="text-danger">FAILED</span>'
-    with open(header, 'w') as fd:
-        fd.write(f'<a class="nav-link" href="#{stamp}">{summary}</a>')
+        excinfo = request.node.report_call.excinfo
+        if isinstance(excinfo.value, BrowserError):
+            e = excinfo.value
+            failure = {
+                'message': e.message,
+                'url': e.url,
+                'loglines': [log.get('message', '') for log in e.logs]
+            }
+        else:
+            failure = {'message': str(excinfo)}
+    result = {
+        'link': slug,
+        'doc': doc,
+        'nodeid': nodeid,
+        'pngs': browser.pngs,
+        'failure': failure
+    }
+
+    filename = os.path.join(report_dir, f'result.{slug}.html')
+    headerfile = os.path.join(report_dir, f'head.{slug}.html')
+    with open(headerfile, 'w') as fd:
+        json.dump(header, fd)
+    with open(filename, 'w') as fd:
+        json.dump(result, fd)
+    browser.pngs = []  # clear the stored screenshots
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -281,7 +273,7 @@ def pytest_runtest_makereport(item, call):
             doc=doc)
 
 
-def letter_gen():
+def lettergen():
     """Return A, B, C, ..., AA, AB, AC, ..., BA, BB, BC, ..."""
     for repeat in range(1, 10):
         for item in itertools.product(ascii_uppercase, repeat=repeat):
@@ -296,52 +288,32 @@ def xpath_contains(node, substring):
     return f'{node}[contains({lc_translate}, "{substring}")]'
 
 
-def generate_report(report_dir):
-    with open('webdriver-report.html', mode='w') as fd:
-        fd.write("""
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>Identity Signup Storyboard</title>
-                <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
-                <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
-                <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
-                <style>
-                  img {
-                    vertical-align: text-top;
-                    width: 200px;
-                    border: 2px solid #ddd
-                  }
-                  h2 {
-                    page-break-before: always;
-                  }
-                  .nav-link {
-                    padding: 0
-                  }
-                </style>
-            </head>
-            <body style="margin: 20px;">
-                <h1 class="h4">Results for Identity Signup Scenarios</h1>
-        """)
+def generate_report(report_dir, project='Identity.UW'):
+    with open(TEMPLATE_FILE) as fd:
+        template = jinja2.Template(fd.read())
+    template.globals.update({
+        'date': str(datetime.datetime.now()),
+        'lettergen': lettergen,
+        'zip': zip
+    })
+    headers = iterfiles(report_dir, 'head.')
+    results = iterfiles(report_dir, 'result.')
+    stream = template.stream(headers=headers, results=results, project=project)
+    stream.dump(os.path.join(report_dir, 'index.html'))
 
-        fd.write('<nav class="nav flex-column">')
-        heads = (f for f in os.listdir(report_dir) if f.startswith('head.'))
-        for head in sorted(heads):
-            head_file = os.path.join(report_dir, head)
-            with open(head_file) as readfd:
-                fd.write(readfd.read())
-            os.remove(head_file)
-        fd.write('</nav>')
 
-        tmps = (f for f in os.listdir(report_dir) if f.startswith('tmp.'))
-        for filename in sorted(tmps):
-            filename = os.path.join(report_dir, filename)
-            with open(filename) as readfd:
-                fd.write(readfd.read())
+def iterfiles(dir, prefix):
+    """
+    Iterate through the objects contained in files starting with prefix.
+    Delete afterwards.
+    """
+    files = (f for f in os.listdir(dir) if f.startswith(prefix))
+    for filename in sorted(files):
+        filename = os.path.join(dir, filename)
+        with open(filename) as fd:
+            data = json.load(fd)
             os.remove(filename)
-
-        fd.write('</body></html>')
+            yield data
 
 
 if __name__ == '__main__':

@@ -13,6 +13,7 @@ def test_basic(browser):
 
 
 def test_xdist(browser):
+    """pytest-xdist will run many tests in parallel. Test that."""
     browser.get('https://google.com')
     time.sleep(1)
     browser.snap()
