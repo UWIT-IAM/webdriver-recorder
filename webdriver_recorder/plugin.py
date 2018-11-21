@@ -32,7 +32,7 @@ def browser():
 
 
 @pytest.fixture(scope='session')
-def report_dir():
+def report_dir(report_generator):
     """Fixture returning the directory containing our report files."""
     tempdir = os.path.join(os.getcwd(), 'webdriver-report')
     with suppress(FileExistsError):
@@ -40,19 +40,19 @@ def report_dir():
     _, worker_file = tempfile.mkstemp(prefix='worker.', dir=tempdir)
     yield tempdir
     os.remove(worker_file)
+    workers = (f for f in os.listdir(tempdir) if f.startswith('worker.'))
+    if not any(workers):
+        report_generator(tempdir)
 
 
 @pytest.fixture(scope='session')
-def report_generator(report_dir):
-    """Fixture to generate the report when the last worker is done."""
-    yield
-    workers = (f for f in os.listdir(report_dir) if f.startswith('worker.'))
-    if not any(workers):
-        generate_report(report_dir)
+def report_generator():
+    """Fixture returning a report_generator which could be customized."""
+    return generate_report
 
 
 @pytest.fixture()
-def report_test(report_dir, request, browser, report_generator):
+def report_test(report_dir, request, browser):
     """
     Print the results to report_file after a test run.
     Import this into test files that use the browser.
