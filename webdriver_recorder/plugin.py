@@ -152,5 +152,5 @@ class ReportResult(object):
     """
     def __init__(self, report, excinfo, doc):
         self.report = report
-        self.excinfo = excinfo,
+        self.excinfo = excinfo
         self.doc = doc
