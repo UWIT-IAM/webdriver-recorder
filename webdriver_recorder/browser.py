@@ -10,6 +10,10 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import pprint
+import json
+from logging import getLogger
+logger = getLogger(__name__)
 
 
 class BrowserRecorder(webdriver.PhantomJS):
@@ -170,7 +174,23 @@ class BrowserError(Exception):
         self.message = message
         self.url = browser.current_url
         self.logs = browser.get_log('browser')
+        self.log_last_http(browser)
         super().__init__(message, self.url, self.logs, *args)
+
+    @staticmethod
+    def log_last_http(browser):
+        """Log the last http transaction as an error."""
+        if 'har' not in browser.log_types:
+            return
+        logs = browser.get_log('har')[-1:]
+        if not logs:
+            return
+        last_message = json.loads(logs[-1].get('message', {}))
+        entries = last_message.get('log', {}).get('entries', [])
+        if not entries:
+            return
+        message = pprint.pformat(entries[-1])
+        logger.error(f'Last HTTP transaction: {message}')
 
 
 def xpath_contains(node, substring):
