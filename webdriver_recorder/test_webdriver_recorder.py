@@ -7,8 +7,8 @@ def test_basic(browser):
     time.sleep(1)
     browser.snap()
     browser.send('keyboard cat\n')
-    browser.click('a', 'images for keyboard cat')
-    browser.wait_for('a', 'google images home')
+    browser.wait_for('a', 'keyboard cat')
+    browser.click('a', 'images')
     assert len(browser.pngs) == 3
 
 
@@ -18,8 +18,8 @@ def test_xdist(browser):
     time.sleep(1)
     browser.snap()
     browser.send('kool aid man\n')
-    browser.click('a', 'images for kool aid man')
-    browser.wait_for('a', 'google images home')
+    browser.wait_for('a', 'kool aid man')
+    browser.click('a', 'images')
     assert len(browser.pngs) == 3
 
 
