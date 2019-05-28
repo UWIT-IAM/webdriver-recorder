@@ -5,6 +5,7 @@ import os
 import time
 from contextlib import contextmanager
 from selenium import webdriver
+import selenium.webdriver.remote.webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -16,21 +17,16 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
-class BrowserRecorder(webdriver.PhantomJS):
+class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
     """
     A selenium webdriver with some extra convenience utilities and some
     automatic screenshot capturing.
     """
-    def __init__(self, *args, width=400, height=200, **kwargs):
-        project_phantomjs = os.path.join('node_modules', '.bin', 'phantomjs')
-        if not args and os.path.isfile(project_phantomjs):
-            # First arg is path to phantomjs. See if it's in node_modules/.
-            args = (project_phantomjs,)
+    pngs = []  # store screenshots here. intentionally global
 
+    def __init__(self, *args, width=400, height=200, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_window_size(width=width, height=height)
-        self.pngs = []  # where to store the screenshots
-        # optionally set by the caller for decryption in send_secret
         self.autocapture = True   # automatically capture screenshots
 
     def __enter__(self):
@@ -201,8 +197,21 @@ def xpath_contains(node, substring):
     return f'{node}[contains({lc_translate}, "{substring}")]'
 
 
+class Chrome(BrowserRecorder, webdriver.Chrome):
+    """Chrome."""
+
+
+class PhantomJS(BrowserRecorder, webdriver.PhantomJS):
+    def __init__(self, *args, **kwargs):
+        project_phantomjs = os.path.join('node_modules', '.bin', 'phantomjs')
+        if not args and os.path.isfile(project_phantomjs):
+            # First arg is path to phantomjs. See if it's in node_modules/.
+            args = (project_phantomjs,)
+        super().__init__(*args, **kwargs)
+
+
 if __name__ == '__main__':
-    with BrowserRecorder() as browser:
+    with PhantomJS() as browser:
         browser.get('https://github.com/UWIT-IAM/webdriver-recorder')
         browser.wait_for('a', 'webdriver-recorder')
         png = browser.pngs.pop()

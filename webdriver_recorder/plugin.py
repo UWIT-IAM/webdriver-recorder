@@ -18,16 +18,27 @@ from string import ascii_uppercase
 import datetime
 import pytest
 import jinja2
-from .browser import BrowserRecorder, BrowserError
+import webdriver_recorder.browser
 
 TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                              'report.template.html')
 
 
 @pytest.fixture(scope='session')
-def browser():
-    """Keep a PhantomJS browser open while we run our tests."""
-    with BrowserRecorder() as browser:
+def browser(phantomjs):
+    """Keep a browser open while we run our tests."""
+    return phantomjs
+
+
+@pytest.fixture(scope='session')
+def chrome():
+    with webdriver_recorder.browser.Chrome() as browser:
+        yield browser
+
+
+@pytest.fixture(scope='session')
+def phantomjs():
+    with webdriver_recorder.browser.PhantomJS() as browser:
         yield browser
 
 
@@ -66,7 +77,7 @@ def report_test(report_dir, request, browser):
     failure = None
     if is_failed:
         excinfo = request.node.report_call.excinfo
-        if isinstance(excinfo.value, BrowserError):
+        if isinstance(excinfo.value, webdriver_recorder.browser.BrowserError):
             e = excinfo.value
             failure = {
                 'message': e.message,
@@ -89,7 +100,7 @@ def report_test(report_dir, request, browser):
         json.dump(header, fd)
     with open(filename, 'w') as fd:
         json.dump(result, fd)
-    browser.pngs = []  # clear the stored screenshots
+    browser.pngs.clear()
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
