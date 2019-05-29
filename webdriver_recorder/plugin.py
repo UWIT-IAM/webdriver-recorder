@@ -1,7 +1,8 @@
 """
 plugin for the following pytest fixtures:
 
-browser - a phantomjs instance BrowserRecorder
+browser - an instance BrowserRecorder (defaults to phantomjs)
+chrome - an Chrome instance
 report_dir - a fixture for handling the setup and teardown of the webdriver
    report. The result will be written here as index.html.
 report_test - a fixture for reporting on an individual test run.
@@ -18,6 +19,7 @@ from string import ascii_uppercase
 import datetime
 import pytest
 import jinja2
+import warnings
 import webdriver_recorder.browser
 
 TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
@@ -32,6 +34,8 @@ def browser(phantomjs):
 
 @pytest.fixture(scope='session')
 def chrome():
+    if not 'CHROME_BIN' in os.environ:
+        warnings.warn('Environment variable CHROME_BIN undefined. Using system default for Chrome.')
     with webdriver_recorder.browser.Chrome() as browser:
         yield browser
 

@@ -198,7 +198,21 @@ def xpath_contains(node, substring):
 
 
 class Chrome(BrowserRecorder, webdriver.Chrome):
-    """Chrome."""
+    def __init__(self, *args, options=None, **kwargs):
+        if not options:
+            options = webdriver.ChromeOptions()
+        if 'CHROME_BIN' in os.environ:
+            options.binary_location = os.environ['CHROME_BIN']
+        if 'NO_HEADLESS' not in os.environ:
+            options.headless = True    # default to what works in CI.
+        super().__init__(*args, options=options, **kwargs)
+
+    def snap(self):
+        """Resize window to get the full page before grabbing a screenshot."""
+        size = self.get_window_size()
+        size['height'] = int(self.execute_script('return document.body.clientHeight'))
+        self.set_window_size(**size)
+        return super().snap()
 
 
 class PhantomJS(BrowserRecorder, webdriver.PhantomJS):
