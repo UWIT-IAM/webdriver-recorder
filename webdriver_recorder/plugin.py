@@ -29,6 +29,7 @@ TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
 @pytest.fixture(scope='session')
 def browser(phantomjs):
     """Keep a browser open while we run our tests."""
+    warnings.warn('Defaulting to deprecated PhantomJS. Chrome is available and will soon be default.')
     return phantomjs
 
 
