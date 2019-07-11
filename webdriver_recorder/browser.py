@@ -11,6 +11,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import pprint
 import json
 from logging import getLogger
@@ -92,7 +93,16 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
             getattr(self, method)(*args)
 
     def snap(self):
-        """Grab a screenshot and store it."""
+        """
+        Store the screenshot as a base64 png in memory.
+        Resize the window ahead of time so the full page shows in the shot.
+        """
+        size = self.get_window_size()
+        height = int(self.execute_script('return document.body.scrollHeight'))
+        # For remote webdriver the scrollHeight still shows a scroll bar.
+        # Bump it up just a little.
+        size['height'] = height + 120
+        self.set_window_size(**size)
         self.pngs.append(self.get_screenshot_as_base64())
 
     def send(self, *strings):
@@ -207,15 +217,14 @@ class Chrome(BrowserRecorder, webdriver.Chrome):
             options.headless = True    # default to what works in CI.
         super().__init__(*args, options=options, **kwargs)
 
-    def snap(self):
-        """Resize window to get the full page before grabbing a screenshot."""
-        size = self.get_window_size()
-        size['height'] = int(self.execute_script('return document.body.clientHeight'))
-        self.set_window_size(**size)
-        return super().snap()
+
+class Remote(BrowserRecorder, webdriver.Remote):
+    """A Selenium Remote webdriver with our special sauce mixed in."""
+    capabilities = DesiredCapabilities
 
 
 class PhantomJS(BrowserRecorder, webdriver.PhantomJS):
+    """Deprecated. Soon to be removed."""
     def __init__(self, *args, **kwargs):
         project_phantomjs = os.path.join('node_modules', '.bin', 'phantomjs')
         if not args and os.path.isfile(project_phantomjs):
@@ -225,7 +234,7 @@ class PhantomJS(BrowserRecorder, webdriver.PhantomJS):
 
 
 if __name__ == '__main__':
-    with PhantomJS() as browser:
+    with Chrome() as browser:
         browser.get('https://github.com/UWIT-IAM/webdriver-recorder')
         browser.wait_for('a', 'webdriver-recorder')
         png = browser.pngs.pop()
