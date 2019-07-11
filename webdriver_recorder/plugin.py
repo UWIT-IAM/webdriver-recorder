@@ -26,6 +26,17 @@ TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                              'report.template.html')
 
 
+def pytest_addoption(parser):
+    group = parser.getgroup("webdriver_recorder")
+    group.addoption(
+        '--selenium-server',
+        action='store',
+        dest='selenium_server',
+        default=None,
+        help='Remote selenium webdriver to connect to (eg localhost:4444)',
+    )
+
+
 @pytest.fixture(scope='session')
 def browser(phantomjs):
     """Keep a browser open while we run our tests."""
@@ -38,6 +49,21 @@ def chrome():
     if not 'CHROME_BIN' in os.environ:
         warnings.warn('Environment variable CHROME_BIN undefined. Using system default for Chrome.')
     with webdriver_recorder.browser.Chrome() as browser:
+        yield browser
+
+
+@pytest.fixture(scope='session')
+def remote_chrome(request):
+    server = request.config.getoption('selenium_server')
+    if not server:
+        server = 'localhost:4444'
+    if 'SELENIUM_SERVER' in os.environ:
+        server = os.environ['SELENIUM_SERVER']
+    capabilities = webdriver_recorder.browser.Remote.capabilities.CHROME
+    browser_ctx = webdriver_recorder.browser.Remote(
+        command_executor=f'http://{server}/wd/hub',
+        desired_capabilities=capabilities)
+    with browser_ctx as browser:
         yield browser
 
 
