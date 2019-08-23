@@ -13,9 +13,7 @@ script:
 before_deploy:
 deploy:
   skip_cleanup: true
-  provider: pypi
-  user: __token__
-  password:
-    secure: "HDmu8b6Kstgvq8IasneDaWPlobPKiWDQTdms5qC+p5RzI9G68Gf0hRLz897qAaRVfcZM/DW4zXMhP2XsMomgamSesXKfZC9bUT5WrVyRrX/9zsg8y6jTqORsxdYJNU33yLBSPGKSFJexVb5ZF+59KB901duYkBZtYqNzrs/Tdx0TTTATku0+dunW+1IOvQ9xR7sugiIp0JQNQO0T09UJl5CmuS77zo3nSK4dXtEmVkuiHFY1VLuP25411OZif0aVpKczRczXCH0miq/pctuNArXWEGjRcYUmiGj5Gbt2pKciYfWsPAflT7hcwf0fznA1TANWFaknqhsSkcLLKEDf+5+iz1s725qCf17/uUanUNd5OFCsJGzI+dUvtevvqz9dhGJ6GB2QUlMGefb67884BdKL3ozny11ZkGE5mHRUr2PxEd12lh937NIcriKfpU9ahJmdlmoHWRM/ZyZ0va3i9630/Cj6/ShppBJ/3vzYntrAH/GKPpvaqegANwuI4MIwhelJgKVzU91rkv+SKBUTgfc30hFnEnngpNBSEemQd4PbBNjd86zeXnmnDiRMN0jW1TJM0V36DN05CbhzexE5TAXi0bDviE5ASFkm7l06MyvnLkOTYXoSx7m4S0TSFHJMZhosvDaA6GWv3+EU/7Waix/JgNqSiJbSzrga82RvPKw="
+  provider: script
+  script: pip install twine && python setup.py sdist && twine upload dist/*
   on:
     tags: true
