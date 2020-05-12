@@ -2,7 +2,7 @@
 plugin for the following pytest fixtures:
 
 browser - an instance BrowserRecorder (defaults to phantomjs)
-chrome - an Chrome instance
+chrome - a Chrome instance
 report_dir - a fixture for handling the setup and teardown of the webdriver
    report. The result will be written here as index.html.
 report_test - a fixture for reporting on an individual test run.
@@ -13,6 +13,7 @@ import os
 import re
 import tempfile
 import itertools
+import cgi
 import json
 from contextlib import suppress
 from string import ascii_uppercase
@@ -99,7 +100,9 @@ def report_test(report_dir, request, browser):
     Print the results to report_file after a test run.
     Import this into test files that use the browser.
     """
+    time1 = str(datetime.datetime.now())
     yield
+    time2 = str(datetime.datetime.now())
     nodeid = request.node.report_call.report.nodeid
     is_failed = request.node.report_call.report.failed
     doc = request.node.report_call.doc
@@ -116,13 +119,15 @@ def report_test(report_dir, request, browser):
                 'loglines': [log.get('message', '') for log in e.logs]
             }
         else:
-            failure = {'message': str(excinfo)}
+            failure = {'message': cgi.excape(str(excinfo))}
     result = {
         'link': slug,
         'doc': doc,
         'nodeid': nodeid,
         'pngs': browser.pngs,
-        'failure': failure
+        'failure': failure,
+        'time1': time1,
+        'time2': time2
     }
 
     filename = os.path.join(report_dir, f'result.{slug}.html')
