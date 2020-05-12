@@ -38,7 +38,7 @@
         {% for result in results %}
             {% set index = loop.index %}
             <h2 class="h5">
-                <a name="{{result.link}}">Test #{{index}}</a>: 
+                <a name="{{result.link}}">Test #{{index}}</a>: {{ result.time1 }} to {{ result.time2 }}<br/>
                 {{ result.doc or result.nodeid }}
             </h2>
             {% if result.doc %}

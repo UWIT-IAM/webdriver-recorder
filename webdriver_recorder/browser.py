@@ -215,6 +215,8 @@ class Chrome(BrowserRecorder, webdriver.Chrome):
             options.binary_location = os.environ['CHROME_BIN']
         if 'NO_HEADLESS' not in os.environ:
             options.headless = True    # default to what works in CI.
+        if 'W3C_COMPLY' not in os.environ:
+            options.add_experimental_option('w3c', False)
         super().__init__(*args, options=options, **kwargs)
 
 
