@@ -114,12 +114,12 @@ def report_test(report_dir, request, browser):
         if isinstance(excinfo.value, webdriver_recorder.browser.BrowserError):
             e = excinfo.value
             failure = {
-                'message': e.message,
-                'url': e.url,
-                'loglines': [log.get('message', '') for log in e.logs]
+                'message': cgi.escape(str(e.message)),
+                'url': cgi.escape(e.url),
+                'loglines': [cgi.escape(log.get('message', '')) for log in e.logs]
             }
         else:
-            failure = {'message': cgi.excape(str(excinfo))}
+            failure = {'message': cgi.escape(str(excinfo))}
     result = {
         'link': slug,
         'doc': doc,
