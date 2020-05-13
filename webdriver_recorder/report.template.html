@@ -15,6 +15,9 @@
             h2 {
             page-break-before: always;
             }
+	    .time {
+	      font-size: 1rem;
+	    }
             .nav-link {
             padding: 0
             }
@@ -38,9 +41,9 @@
         {% for result in results %}
             {% set index = loop.index %}
             <h2 class="h5">
-                <a name="{{result.link}}">Test #{{index}}</a>: {{ result.time1 }} to {{ result.time2 }}<br/>
-                {{ result.doc or result.nodeid }}
+                <a name="{{result.link}}">Test #{{index}}</a>: <span class="time"> {{ result.time1 }} to {{ result.time2 }}<span/>
             </h2>
+	    <h3 class="h6"> {{ result.doc or result.nodeid }} </h3>
             {% if result.doc %}
                 <h3 class="h6">{{result.nodeid}}</h3>
             {% endif %}
