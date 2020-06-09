@@ -1,37 +1,63 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
 import re
 from setuptools import setup
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-VERSION_FILE = os.path.join(BASE_DIR, 'webdriver_recorder', 'VERSION')
 
-def strip_comments(line): return line.split('#')[0]
-VERSION = ''.join(map(strip_comments, open(VERSION_FILE).readlines())).strip()
-VERSION = re.sub('^v', '', VERSION)
+
+def strip_comments(line):
+    return line.split('#')[0]
+
+
+def file_path(*parts):
+    CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(CUR_DIR, *parts)
+
 
 desc = 'Enhances a selenium webdriver to record screenshots along the way'
-long_description = open(os.path.join(BASE_DIR, 'README.md')).read()
 
+with open(file_path('webdriver_recorder/VERSION')) as f:
+    version = ''.join(map(strip_comments, f.readlines())).strip()
+    version = re.sub('^v', '', version)
 
-setup(name='uw-webdriver-recorder',
-      install_requires=['selenium', 'pytest', 'jinja2'],
-      url='https://github.com/UWIT-IAM/webdriver-recorder',
-      author='UW-IT Identity and Access Management',
-      author_email='jpf@uw.edu',
-      version=VERSION,
-      description=desc,
-      license='Apache License, Version 2.0',
-      long_description=long_description,
-      long_description_content_type="text/markdown",
-      packages=['webdriver_recorder'],
-      package_data={'webdriver_recorder': ['VERSION', '*.html']},
-      python_requires='>=3.4',
-      setup_requires=['pytest-runner'],
-      entry_points={'pytest11': [
-          'uw-webdriver-recorder = webdriver_recorder.plugin']},
-      classifiers=[
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: OS Independent',
+with open(file_path('README.md')) as f:
+    long_description = f.read()
+
+setup(
+    name='uw-webdriver-recorder',
+    version=version,
+    packages=['webdriver_recorder'],
+    include_package_data=True,
+    data_files=['README.md', 'webdriver_recorder/VERSION'],
+    author='UW-IT Identity and Access Management',
+    author_email='jpf@uw.edu',
+    maintainer_email='gootom@uw.edu',
+    license='Apache Software License 2.0',
+    url='https://github.com/uwit-iam/webdriver-recorder',
+    description='desc',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    py_modules=['webdriver_recorder'],
+    python_requires='>=3.4',
+    install_requires=[
+        'pytest>=3.5.0',
+        'jinja2',
+        'selenium',
+        'pydantic',
+        'webdriver-manager',
+    ],
+    classifiers=[
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.6',
-        'Framework :: Pytest']
-      )
+        'Programming Language :: Python :: 3.7',
+        'Operating System :: OS Independent',
+        'Framework :: Pytest',
+        'License :: OSI Approved :: Apache Software License',
+    ],
+    entry_points={
+        'pytest11': [
+            'uw-webdriver-recorder = webdriver_recorder.plugin',
+        ],
+    },
+)

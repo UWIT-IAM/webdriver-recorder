@@ -4,6 +4,8 @@ BrowserRecorder class for recording snapshots between waits.
 import os
 import time
 from contextlib import contextmanager
+from typing import Optional, List
+
 from selenium import webdriver
 import selenium.webdriver.remote.webdriver
 from selenium.webdriver.common.keys import Keys
@@ -15,15 +17,24 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import pprint
 import json
 from logging import getLogger
+
 logger = getLogger(__name__)
+
+__all__ = [
+    'BrowserRecorder',
+    'Waiter',
+    'BrowserError',
+    'Chrome',
+    'Remote',
+]
 
 
 class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
     """
-    A selenium webdriver with some extra convenience utilities and some
+    A selenium webdriver with extra convenience utilities and
     automatic screenshot capturing.
     """
-    pngs = []  # store screenshots here. intentionally global
+    pngs: List[bytes] = []  # store screenshots here. intentionally global
 
     def __init__(self, *args, width=400, height=200, **kwargs):
         super().__init__(*args, **kwargs)
@@ -50,38 +61,41 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         """Clear the active element."""
         self.switch_to.active_element.clear()
 
-    def click(self, tag, substring='', wait=True, timeout=5, capture_delay=0):
+    def click(self,
+              tag: str,
+              substring: str = '',
+              wait: bool = True,
+              timeout: int = 5,
+              capture_delay: int = 0):
         """
         Find tag containing substring and click it.
         wait - give it time to show up in the DOM.
         """
-        search = (By.XPATH, xpath_contains(f'//{tag}', substring))
+        search = (By.XPATH, _xpath_contains(f'//{tag}', substring))
         with self.wrap_exception(f'find tag "{tag}" with string "{substring}"'):
             if wait and timeout:
                 wait = Waiter(self, timeout)
-                wait.until(EC.element_to_be_clickable(search),
-                            capture_delay=capture_delay)
+                wait.until(EC.element_to_be_clickable(search), capture_delay=capture_delay)
             self.find_element(*search).click()
 
-    def click_button(self, substring=''):
+    def click_button(self, substring: str = ''):
         """
         Wait for a button with substring to become clickable then click it.
         """
-        search = (By.XPATH, xpath_contains(f'//button', substring))
+        search = (By.XPATH, _xpath_contains('//button', substring))
         with self.wrap_exception(f'click button with string "{substring}" when clickable'):
             wait = Waiter(self, getattr(self, 'default_wait', 5))
             wait.until(EC.element_to_be_clickable(search))
             self.find_element(*search).click()
 
-    def wait_for(self, tag, substring, timeout=None, capture_delay=0):
+    def wait_for(self, tag: str, substring: str, timeout: Optional[int] = None, capture_delay: int = 0):
         """Wait for tag containing substring to show up in the DOM."""
         if timeout is None:
             timeout = getattr(self, 'default_wait', 5)
-        search = (By.XPATH, xpath_contains(f'//{tag}', substring))
+        search = (By.XPATH, _xpath_contains(f'//{tag}', substring))
         with self.wrap_exception(f'wait for visibility of tag "{tag}" with string "{substring}"'):
             wait = Waiter(self, timeout)
-            wait.until(EC.visibility_of_element_located(search),
-                        capture_delay=capture_delay)
+            wait.until(EC.visibility_of_element_located(search), capture_delay=capture_delay)
 
     def run_commands(self, commands):
         """
@@ -159,7 +173,7 @@ class Waiter(WebDriverWait):
         super().__init__(driver, timeout, *args, **kwargs)
         self.__driver = driver
 
-    def until(self, *arg, capture_delay=0, **kwargs):
+    def until(self, *arg, capture_delay: int = 0, **kwargs):
         """
         Every time we wait, take a screenshot of the outcome.
         capture_delay - when we're done waiting, wait just  a little longer
@@ -186,9 +200,10 @@ class BrowserError(Exception):
     @staticmethod
     def log_last_http(browser):
         """Log the last http transaction as an error."""
+
         if 'har' not in browser.log_types:
             return
-        logs = browser.get_log('har')[-1:]
+        logs = browser.get_log('har')
         if not logs:
             return
         last_message = json.loads(logs[-1].get('message', {}))
@@ -199,7 +214,7 @@ class BrowserError(Exception):
         logger.error(f'Last HTTP transaction: {message}')
 
 
-def xpath_contains(node, substring):
+def _xpath_contains(node, substring):
     lc_translate = "translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
     if '"' in substring:
         raise ValueError('double quotes in substring not supported')
@@ -209,8 +224,7 @@ def xpath_contains(node, substring):
 
 class Chrome(BrowserRecorder, webdriver.Chrome):
     def __init__(self, *args, options=None, **kwargs):
-        if not options:
-            options = webdriver.ChromeOptions()
+        options = options or webdriver.ChromeOptions()
         if 'CHROME_BIN' in os.environ:
             options.binary_location = os.environ['CHROME_BIN']
         if 'NO_HEADLESS' not in os.environ:
@@ -223,23 +237,3 @@ class Chrome(BrowserRecorder, webdriver.Chrome):
 class Remote(BrowserRecorder, webdriver.Remote):
     """A Selenium Remote webdriver with our special sauce mixed in."""
     capabilities = DesiredCapabilities
-
-
-class PhantomJS(BrowserRecorder, webdriver.PhantomJS):
-    """Deprecated. Soon to be removed."""
-    def __init__(self, *args, **kwargs):
-        project_phantomjs = os.path.join('node_modules', '.bin', 'phantomjs')
-        if not args and os.path.isfile(project_phantomjs):
-            # First arg is path to phantomjs. See if it's in node_modules/.
-            args = (project_phantomjs,)
-        super().__init__(*args, **kwargs)
-
-
-if __name__ == '__main__':
-    with Chrome() as browser:
-        browser.get('https://github.com/UWIT-IAM/webdriver-recorder')
-        browser.wait_for('a', 'webdriver-recorder')
-        png = browser.pngs.pop()
-    print('<html><body><h1>Your result</h1>')
-    print(f'<img src="data:image/png;base64,{png}">')
-    print('</body></html>')
