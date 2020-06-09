@@ -1,0 +1,2 @@
+include webdriver_recorder/report.template.html
+inlcude webdriver_recorder/VERSION

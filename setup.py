@@ -28,7 +28,7 @@ setup(
     name='uw-webdriver-recorder',
     version=version,
     packages=['webdriver_recorder'],
-    include_package_data=True,
+    package_data={"webdriver_recorder": ['report.template.html', 'VERSION']},
     data_files=['README.md', 'webdriver_recorder/VERSION'],
     author='UW-IT Identity and Access Management',
     author_email='jpf@uw.edu',
