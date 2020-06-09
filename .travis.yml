@@ -2,10 +2,9 @@ language: python
 python: ["3.6"]
 install:
   - pip install -U pip setuptools tox
-  - tox
   - git describe --tags > webdriver_recorder/VERSION
 script:
-  - /bin/true
+  - tox  # This runs tests, runs flake8, and generates a coverage report both in html and in the terminal.
 deploy:
   skip_cleanup: true
   provider: script

@@ -32,7 +32,7 @@ setup(
     data_files=['README.md', 'webdriver_recorder/VERSION'],
     author='UW-IT Identity and Access Management',
     author_email='jpf@uw.edu',
-    maintainer_email='gootom@uw.edu',
+    maintainer_email='goodtom@uw.edu',
     license='Apache Software License 2.0',
     url='https://github.com/uwit-iam/webdriver-recorder',
     description='desc',

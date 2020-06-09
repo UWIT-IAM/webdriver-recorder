@@ -40,7 +40,7 @@ def pytest_addoption(parser):
 
 class HTMLEscapeBaseModel(BaseModel):
     """
-    Base model that automatically escapes all strings all passed into it.
+    Base model that automatically escapes all strings passed into it.
     """
     @root_validator(pre=True)
     def escape_strings(cls, values) -> Dict[str, Any]:

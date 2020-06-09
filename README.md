@@ -8,9 +8,19 @@ of different scenarios. This uses python3.4+ only.
 pip install uw-webdriver-recorder
 ```
 
-## Testing this plugin
+## Maintaining this plugin
 
-To test this plugin, make sure you have `tox` installed (`pip install tox`) then run `tox`.
+To test this plugin, make sure you have `tox` installed (`pip install tox`) then run `tox`. This will test, lint, and 
+run coverage reports. 
+
+To build this plugin for release, you can do `python setup.py sdist`, to prepare for uploading to PyPI, or you can
+install to a local python environment with `pip install .` or even `python setup.py install`. All of these options 
+should work just fine depending on your needs. A
+
+**A note about local installation:** Installing by any means other than `pip install uw-webdriver-recorder` will 
+show a version of `0.0.1`; that is because our versioning is managed by our repository tags and is only properly 
+resolved by our release process.
+
 
 ## Running it
 Assume the following file:
