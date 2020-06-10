@@ -1,0 +1,14 @@
+<html>
+<script>
+    function updateDivText() {
+        inputText = document.getElementById('inputField').value;
+        document.getElementById('outputDiv').innerHTML = '<p>' + inputText + '</p>';
+    }
+</script>
+<body>
+<input autofocus id="inputField" type="text"/>
+<input autofocus id="inputField2" type="text"/>
+<button id="doUpdate" onclick="updateDivText()">Update</button>
+<div id="outputDiv"></div>
+</body>
+</html>

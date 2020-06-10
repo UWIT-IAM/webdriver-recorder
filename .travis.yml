@@ -1,19 +1,10 @@
 language: python
 python: ["3.6"]
-#
-#  If we switch from phantomJS to Chrome we'll be happier (KL
-#
-node_js: node
 install:
+  - pip install -U pip setuptools tox
   - git describe --tags > webdriver_recorder/VERSION
-  - pip install -U pip setuptools
-  - pip install python-coveralls coverage
-#KL #IAM-137##  - npm install phantomjs-prebuilt
 script:
-#KL #IAM-137##  - coverage run --source=. --omit='.eggs/*' setup.py test
-#KL #IAM-147##  - coveralls
-  - /bin/true
-before_deploy:
+  - tox  # This runs tests, runs flake8, and generates a coverage report both in html and in the terminal.
 deploy:
   skip_cleanup: true
   provider: script
