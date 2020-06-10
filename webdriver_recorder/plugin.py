@@ -12,7 +12,6 @@ from typing import List, Any, Dict, Optional, Callable
 import jinja2
 import pytest
 from pydantic import BaseModel, root_validator
-from webdriver_manager.chrome import ChromeDriverManager
 
 from . import browser as browser_
 
@@ -96,7 +95,7 @@ def browser(chrome):
 def chrome():
     if 'CHROME_BIN' not in os.environ:
         warnings.warn('Environment variable CHROME_BIN undefined. Using system default for Chrome.')
-    with browser_.Chrome(ChromeDriverManager().install()) as browser:
+    with browser_.Chrome() as browser:
         yield browser
 
 
