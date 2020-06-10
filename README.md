@@ -10,8 +10,18 @@ pip install uw-webdriver-recorder
 
 ## Maintaining this plugin
 
+It is highly recommended that you create a virtualenv in your repository directory:
+
+```
+python3 -m virtualenv env  # Run once
+source env/bin/activate
+```
+
+Otherwise, you'll need to make sure that dependencies for this package are natively discoverable on your system.
+See [Requirements](#requirements).
+
 To test this plugin, make sure you have `tox` installed (`pip install tox`) then run `tox`. This will test, lint, and 
-run coverage reports. 
+run coverage reports. (If you have a virtualenv, make sure to activate it before running tox.)
 
 To build this plugin for release, you can do `python setup.py sdist`, to prepare for uploading to PyPI, or you can
 install to a local python environment with `pip install .` or even `python setup.py install`. All of these options 
@@ -21,6 +31,35 @@ should work just fine depending on your needs. A
 show a version of `0.0.1`; that is because our versioning is managed by our repository tags and is only properly 
 resolved by our release process.
 
+
+## Requirements
+
+You must have `chromedriver` available in your environment. 
+See the [official documentation](https://chromedriver.chromium.org/) to understand the driver and its installation 
+process. 
+
+### Installing and configuring the chromedriver
+
+For the purposes of testing and maintaining this package, there is a convenience script to help download and install
+the `chromedriver`, a required binary for this plugin. For development, it is recommended that you install 
+chromedriver to your virtualenv like so:
+
+```
+python3 -m virtualenv env
+CHROMEDRIVER_DIST=mac64 ./bootstrap_chromedriver.sh   # The default install location is in env/bin
+```
+
+Then, it will always be in your path, as long as your working in your virtualenv (`source env/bin/activate`).
+
+This script is not installed as part of this plugin, and is only available from the git repository. There are a number
+of solutions available to install chromedriver on your system, but this plugin does not assume that responsibility.
+
+If your system has chromedriver installed somewhere undiscoverable, you can explicitly provide the correct path by
+setting the CHROME_BIN environment variable:
+
+```
+CHROME_BIN="/path/to/google-chrome-stable" pytest
+```
 
 ## Running it
 Assume the following file:

@@ -1,6 +1,9 @@
 language: python
 python: ["3.6"]
+addons:
+  chrome: stable
 install:
+  - CHROMEDRIVER_DIR=/usr/local/bin CHROMEDRIVER_DIST=linux64 sudo ./bootstrap_chromedriver.sh
   - pip install -U pip setuptools tox
   - git describe --tags > webdriver_recorder/VERSION
 script:

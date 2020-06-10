@@ -45,7 +45,6 @@ setup(
         'jinja2',
         'selenium',
         'pydantic',
-        'webdriver-manager',
     ],
     classifiers=[
         'Programming Language :: Python',

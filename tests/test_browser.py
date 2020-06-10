@@ -2,14 +2,11 @@ import json
 import os
 import time
 from datetime import datetime
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 import pytest
-from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
-from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.remote.command import Command
-from webdriver_manager.chrome import ChromeDriverManager
 
 from webdriver_recorder.browser import Chrome, BrowserError, logger, _xpath_contains
 
@@ -34,7 +31,7 @@ def session_browser():
             """
             return encrypted_text.replace('secret-', '')
 
-    return TestChrome(ChromeDriverManager().install())
+    return TestChrome()
 
 
 @pytest.fixture
@@ -64,7 +61,7 @@ def test_context_stops_client_on_exit(url):
     class TestChrome(Chrome):
         def __init__(self):
             self.is_stopped = False
-            super().__init__(ChromeDriverManager().install())
+            super().__init__()
 
         def stop_client(self):
             self.is_stopped = True
@@ -206,7 +203,7 @@ def test_log_last_http_with_har_no_entries(browser, log_recorder, monkeypatch):
 def test_incorrect_chrome_bin():
     os.environ['CHROME_BIN'] = '/path/to/chrome'
     with pytest.raises(WebDriverException):
-        browser = Chrome(ChromeDriverManager().install())
+        browser = Chrome()
     del os.environ['CHROME_BIN']
 
 
