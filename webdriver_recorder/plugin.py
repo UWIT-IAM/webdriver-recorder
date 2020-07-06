@@ -243,5 +243,5 @@ def iterfiles(dir, prefix):
         filename = os.path.join(dir, filename)
         with open(filename) as fd:
             data = json.load(fd)
-            os.remove(filename)
-            yield data
+        yield data
+        os.remove(filename)
