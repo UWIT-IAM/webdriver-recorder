@@ -8,6 +8,7 @@ import tempfile
 import warnings
 from string import ascii_uppercase
 from typing import List, Any, Dict, Optional, Callable
+from pathlib import Path
 
 import jinja2
 import pytest
@@ -122,7 +123,8 @@ def report_dir(report_generator, request) -> str:
     # Ensures we don't generate reports while tests running (unless explicitly requested) using report_generator().
     # The worker file is created at the beginning of the test session, and removed at the end (after the `yield` below).
     # If multiple testing threads are running concurrently, a report will not be generated until the last one completes.
-    _, worker_file = tempfile.mkstemp(prefix='worker.', dir=tempdir)
+    worker_file = tempfile.mktemp(prefix='worker.', dir=tempdir)
+    Path(worker_file).touch()
     yield tempdir
     os.remove(worker_file)
     workers = (f for f in os.listdir(tempdir) if f.startswith('worker.'))
@@ -241,5 +243,5 @@ def iterfiles(dir, prefix):
         filename = os.path.join(dir, filename)
         with open(filename) as fd:
             data = json.load(fd)
-            os.remove(filename)
-            yield data
+        yield data
+        os.remove(filename)
