@@ -4,6 +4,7 @@ import shutil
 
 import pytest
 
+from webdriver_recorder.browser import XPathWithSubstringLocator
 from webdriver_recorder.plugin import lettergen
 
 # Enables testing failure cases in plugin logic by dynamically generating
@@ -122,8 +123,8 @@ def test_happy_remote_chrome(remote_chrome):
 
 # The underscore here keeps pytest from executing this as a test itself.
 def _test_happy_case(browser):
-    browser.wait_for('button', 'update')
+    browser.wait_for(XPathWithSubstringLocator(tag='button', displayed_substring='update'))
     browser.send_inputs('boundless')
-    browser.click('button', 'update')
-    browser.wait_for('p', 'boundless')
+    browser.click_button('update')
+    browser.wait_for(XPathWithSubstringLocator(tag='p', displayed_substring='boundless'))
     assert len(browser.pngs) == 3

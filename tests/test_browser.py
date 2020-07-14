@@ -2,13 +2,14 @@ import json
 import os
 import time
 from datetime import datetime
-from typing import NoReturn
+from typing import NoReturn, Any
 
 import pytest
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.command import Command
 
-from webdriver_recorder.browser import Chrome, BrowserError, logger, _xpath_contains
+from webdriver_recorder.browser import Chrome, BrowserError, logger, _xpath_contains, XPathWithSubstringLocator, \
+    Locator, SearchMethod
 
 
 @pytest.fixture
@@ -45,6 +46,13 @@ def browser(session_browser, url) -> Chrome:
     session_browser.pngs = []
 
 
+
+def _fill_in_and_wait(browser: Chrome, value: str, locator: Locator, capture_delay: int = 0) -> Any:
+    browser.send_inputs(value)
+    browser.click_button('update')
+    return browser.wait_for(locator, capture_delay=capture_delay)
+
+
 def be_boundless_and_wait(browser: Chrome, capture_delay: int = 0) -> NoReturn:
     """
     A convenience function for testing the same interactive path under different circumstances.
@@ -52,9 +60,20 @@ def be_boundless_and_wait(browser: Chrome, capture_delay: int = 0) -> NoReturn:
     :param capture_delay:
     :return:
     """
-    browser.send_inputs('be boundless')
-    browser.click_button('update')
-    browser.wait_for('p', 'be boundless', capture_delay=capture_delay)
+    return _fill_in_and_wait(browser,
+                             value='be boundless',
+                             locator=XPathWithSubstringLocator(tag='p', displayed_substring='be boundless'),
+                             capture_delay=capture_delay)
+
+
+@pytest.mark.parametrize('locator', [
+    XPathWithSubstringLocator(tag='p', displayed_substring='be boundless'),
+    Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='div#outputDiv'),
+    Locator(search_method=SearchMethod.ID, search_value='outputDiv')
+])
+def test_wait_for(locator, browser):
+    element = _fill_in_and_wait(browser, 'be boundless', locator)
+    assert element.text == 'be boundless'
 
 
 def test_context_stops_client_on_exit(url):
@@ -83,7 +102,7 @@ def test_run_commands(browser):
     browser.run_commands([
         ('send_inputs', 'boundless'),
         ('click_button', 'update'),
-        ('wait_for', 'p', 'boundless')
+        ('wait_for', XPathWithSubstringLocator(tag='p', displayed_substring='boundless'))
     ])
 
 
@@ -250,3 +269,26 @@ def test_wrap_exception_no_autocapture(browser):
             with browser.wrap_exception('expected exception'):
                 raise AttributeError('oh noes!')
     assert len(browser.pngs) == 1
+
+
+def test_locator_defaults():
+    locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='foo')
+    assert locator.search_value == 'foo'
+    assert 'css' in locator.state_description
+    assert 'foo' in locator.state_description
+
+
+@pytest.mark.parametrize('wait', [
+    True,
+    False
+])
+def test_click(browser, wait):
+    browser.send_inputs('be boundless')
+    output_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='#outputDiv')
+    button_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='#doUpdate')
+    output_element = browser.find_element(*output_locator.payload)
+    assert not output_element.text
+    browser.click(button_locator, wait=wait)
+    assert output_element.text == 'be boundless'
+
+
