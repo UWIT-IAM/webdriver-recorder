@@ -1,22 +1,23 @@
+"""BrowserRecorder class for recording snapshots between waits.
 """
-BrowserRecorder class for recording snapshots between waits.
-"""
+import json
 import os
+import pprint
 import time
 from contextlib import contextmanager
-from typing import Optional, List
+from enum import Enum
+from logging import getLogger
+from typing import Optional, List, Tuple
 
-from selenium import webdriver
 import selenium.webdriver.remote.webdriver
-from selenium.webdriver.common.keys import Keys
+from pydantic import BaseModel, Field
+from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-import pprint
-import json
-from logging import getLogger
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 logger = getLogger(__name__)
 
@@ -26,7 +27,74 @@ __all__ = [
     'BrowserError',
     'Chrome',
     'Remote',
+    'Locator',
+    'XPathWithSubstringLocator',
+    'SearchMethod'
 ]
+
+
+class SearchMethod(Enum):
+    """
+    An Enum based on selenium's By object, so that values can be explicitly declared.
+    """
+    ID = By.ID
+    XPATH = By.XPATH
+    LINK_TEXT = By.LINK_TEXT
+    PARTIAL_LINK_TEXT = By.PARTIAL_LINK_TEXT
+    NAME = By.NAME
+    TAG_NAME = By.TAG_NAME
+    CLASS_NAME = By.CLASS_NAME
+    CSS_SELECTOR = By.CSS_SELECTOR
+
+
+class Locator(BaseModel):
+    """
+    A base class for defining selenium search locators. Essentially this is meant to just be
+    passed into selenium's _find_element/_find_elements functions. In some of the high-level selenium abstractions,
+    this behavior is invisible, or must be late-bound. This allows for more flexibility with the webdriver_recorder
+    API.
+
+    Usage:
+
+        danger_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='div.panel.panel-danger')
+        browser.find_element(*danger_locator.payload)
+    """
+    search_method: SearchMethod
+    search_value: Optional[str]
+
+    @property
+    def payload(self) -> Tuple:
+        return self.search_method.value, self._search_value
+
+    @property
+    def _search_value(self) -> str:
+        return self.search_value or ''
+
+    @property
+    def state_description(self) -> str:
+        return f'wait for {self._search_value} to be visible by method: {self.search_method.value}'
+
+
+class XPathWithSubstringLocator(Locator):
+    """
+    The CSS spec does not allow for selectors based on element text, making XPath ideal for
+    such searches. This subclass searches for a given tag with the substring displayed; matches are
+    case-insensitive.
+
+    locator = XPathWithSubstringLocator(tag='div', displayed_substring='hello')  # will match <div>HELLO</div>
+    """
+    search_method = Field(SearchMethod.XPATH, const=True)
+    tag: str
+    displayed_substring: str
+
+    @property
+    def _search_value(self) -> str:
+        return _xpath_contains(f'//{self.tag}', self.displayed_substring)
+
+    @property
+    def state_description(self) -> str:
+        return f'wait for {self.tag} with contents "{self.displayed_substring}" ' \
+               f'to be visible via xpath {self.search_value}'
 
 
 class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
@@ -62,8 +130,7 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         self.switch_to.active_element.clear()
 
     def click(self,
-              tag: str,
-              substring: str = '',
+              locator: Locator,
               wait: bool = True,
               timeout: int = 5,
               capture_delay: int = 0):
@@ -71,31 +138,31 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         Find tag containing substring and click it.
         wait - give it time to show up in the DOM.
         """
-        search = (By.XPATH, _xpath_contains(f'//{tag}', substring))
-        with self.wrap_exception(f'find tag "{tag}" with string "{substring}"'):
+        with self.wrap_exception(locator.state_description):
             if wait and timeout:
                 wait = Waiter(self, timeout)
-                wait.until(EC.element_to_be_clickable(search), capture_delay=capture_delay)
-            self.find_element(*search).click()
+                element = wait.until(EC.element_to_be_clickable(locator.payload), capture_delay=capture_delay)
+            else:
+                element = self.find_element(*locator.payload)
+            element.click()
 
     def click_button(self, substring: str = ''):
         """
         Wait for a button with substring to become clickable then click it.
         """
-        search = (By.XPATH, _xpath_contains('//button', substring))
-        with self.wrap_exception(f'click button with string "{substring}" when clickable'):
-            wait = Waiter(self, getattr(self, 'default_wait', 5))
-            wait.until(EC.element_to_be_clickable(search))
-            self.find_element(*search).click()
+        locator = XPathWithSubstringLocator(tag='button', displayed_substring=substring)
+        return self.click(locator, wait=True)
 
-    def wait_for(self, tag: str, substring: str, timeout: Optional[int] = None, capture_delay: int = 0):
+    def wait_for(self,
+                 locator: Locator,
+                 timeout: Optional[int] = None,
+                 capture_delay: int = 0):
         """Wait for tag containing substring to show up in the DOM."""
         if timeout is None:
             timeout = getattr(self, 'default_wait', 5)
-        search = (By.XPATH, _xpath_contains(f'//{tag}', substring))
-        with self.wrap_exception(f'wait for visibility of tag "{tag}" with string "{substring}"'):
+        with self.wrap_exception(locator.state_description):
             wait = Waiter(self, timeout)
-            wait.until(EC.visibility_of_element_located(search), capture_delay=capture_delay)
+            return wait.until(EC.visibility_of_element_located(locator.payload), capture_delay=capture_delay)
 
     def run_commands(self, commands):
         """
@@ -180,12 +247,13 @@ class Waiter(WebDriverWait):
           for whatever animations to take effect.
         """
         try:
-            super().until(*arg, **kwargs)
+            element = super().until(*arg, **kwargs)
         finally:
             if self.__driver.autocapture:
                 if capture_delay:
                     time.sleep(capture_delay)
                 self.__driver.snap()
+        return element
 
 
 class BrowserError(Exception):

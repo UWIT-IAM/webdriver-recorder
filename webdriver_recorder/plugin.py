@@ -2,13 +2,13 @@ import datetime
 import html
 import itertools
 import json
+import logging
 import os
 import re
 import tempfile
-import warnings
+from pathlib import Path
 from string import ascii_uppercase
 from typing import List, Any, Dict, Optional, Callable
-from pathlib import Path
 
 import jinja2
 import pytest
@@ -18,6 +18,8 @@ from . import browser as browser_
 
 TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                              'report.template.html')
+
+log = logging.getLogger(__name__)
 
 
 def pytest_addoption(parser):
@@ -95,7 +97,7 @@ def browser(chrome):
 @pytest.fixture(scope='session')
 def chrome():
     if 'CHROME_BIN' not in os.environ:
-        warnings.warn('Environment variable CHROME_BIN undefined. Using system default for Chrome.')
+        log.info('Environment variable CHROME_BIN undefined. Using system default for Chrome.')
     with browser_.Chrome() as browser:
         yield browser
 
