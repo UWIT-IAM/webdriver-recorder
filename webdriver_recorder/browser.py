@@ -94,7 +94,7 @@ class XPathWithSubstringLocator(Locator):
     @property
     def state_description(self) -> str:
         return f'wait for {self.tag} with contents "{self.displayed_substring}" ' \
-               f'to be visible via xpath {self.search_value}'
+               f'to be visible via xpath {self._search_value}'
 
 
 class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
@@ -146,12 +146,15 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
                 element = self.find_element(*locator.payload)
             element.click()
 
-    def click_button(self, substring: str = ''):
+    def click_tag(self, tag: str, with_substring: str, **kwargs):
+        """See wait_for_tag; this does the same thing for clicking on random elements."""
+        return self.click(XPathWithSubstringLocator(tag=tag, displayed_substring=with_substring), **kwargs)
+
+    def click_button(self, substring: str = '', **kwargs):
         """
         Wait for a button with substring to become clickable then click it.
         """
-        locator = XPathWithSubstringLocator(tag='button', displayed_substring=substring)
-        return self.click(locator, wait=True)
+        return self.click_tag('button', substring, **kwargs)
 
     def wait_for(self,
                  locator: Locator,
@@ -163,6 +166,14 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         with self.wrap_exception(locator.state_description):
             wait = Waiter(self, timeout)
             return wait.until(EC.visibility_of_element_located(locator.payload), capture_delay=capture_delay)
+
+    def wait_for_tag(self, tag: str, with_substring: str, **kwargs):
+        """
+        Since the XPathWithSubstringLocator is still the best way to search by text, this shim provides
+        easy access to it for dependents who want to upgrade to V3.0 but not have to use XPathWithSubstringLocator
+        all over the place. This has the same signature as the legacy `wait_for`.
+        """
+        return self.wait_for(XPathWithSubstringLocator(tag=tag, displayed_substring=with_substring), **kwargs)
 
     def run_commands(self, commands):
         """

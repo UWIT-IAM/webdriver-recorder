@@ -46,7 +46,6 @@ def browser(session_browser, url) -> Chrome:
     session_browser.pngs = []
 
 
-
 def _fill_in_and_wait(browser: Chrome, value: str, locator: Locator, capture_delay: int = 0) -> Any:
     browser.send_inputs(value)
     browser.click_button('update')
@@ -74,6 +73,12 @@ def be_boundless_and_wait(browser: Chrome, capture_delay: int = 0) -> NoReturn:
 def test_wait_for(locator, browser):
     element = _fill_in_and_wait(browser, 'be boundless', locator)
     assert element.text == 'be boundless'
+
+
+def test_wait_for_tag(browser):
+    browser.send_inputs('be boundless')
+    browser.click_button('update')
+    assert browser.wait_for_tag('p', 'be boundless')
 
 
 def test_context_stops_client_on_exit(url):
@@ -144,7 +149,6 @@ def test_wait_capture_delay(browser):
     end_time = datetime.now()
     delta = end_time - start_time
     assert(delta.seconds) >= delay
-
 
 
 # TODO: (goodtom) The `decrypt` behavior was implemented as abstract but never used; if we ever decide to make
@@ -290,5 +294,3 @@ def test_click(browser, wait):
     assert not output_element.text
     browser.click(button_locator, wait=wait)
     assert output_element.text == 'be boundless'
-
-
