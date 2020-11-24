@@ -13,8 +13,10 @@ from typing import List, Any, Dict, Optional, Callable
 import jinja2
 import pytest
 from pydantic import BaseModel, root_validator
+from selenium import webdriver
 
 from . import browser as browser_
+
 
 TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                              'report.template.html')
@@ -95,10 +97,61 @@ def browser(chrome):
 
 
 @pytest.fixture(scope='session')
-def chrome():
-    if 'CHROME_BIN' not in os.environ:
-        log.info('Environment variable CHROME_BIN undefined. Using system default for Chrome.')
-    with browser_.Chrome() as browser:
+def chromedriver_bin() -> str:
+    """
+    If provided (either by overriding this fixture of setting the CHROME_BIN
+    environment variable), will pass that path as the binary option when creating
+    browser instances.
+    """
+    return os.environ.get('CHROME_BIN')
+
+
+@pytest.fixture(scope='session')
+def disable_headless() -> bool:
+    """
+    Defaults to False. Can be toggled off by setting the NO_HEADLESS environment
+    variable (to any value) or overriding this fixture. Disables headless mode,
+    which will start an actual browser window. Not recommended!
+    """
+    return bool(os.environ.get('NO_HEADLESS'))
+
+
+@pytest.fixture(scope='session')
+def disable_w3c() -> bool:
+    """
+    Defaults to True. Can be toggled off by setting W3C_COMPLY environment variable (
+    to any value) or overriding this fixture. Disables W3C compliance in the browser
+    settings.
+    """
+    return not bool(os.environ.get('W3C_COMPLY'))
+
+
+@pytest.fixture(scope='session')
+def chrome_options(
+        chromedriver_bin, disable_headless, disable_w3c) -> webdriver.ChromeOptions:
+    """
+    You can extend this fixture in your tests to configure your browser sessions:
+
+    def chrome_options(chrome_options):
+        chrome_options.add_experiemental_option('foo', 'bar')
+        return chrome_options
+    """
+    options = webdriver.ChromeOptions()
+    if chromedriver_bin:
+        log.exception(f"Setting chromedriver binary_location to {chromedriver_bin}")
+        options.binary_location = chromedriver_bin
+    if not disable_headless:
+        log.exception("Enabling chromedriver headless mode")
+        options.headless = True
+    if disable_w3c:
+        log.exception("Disabling strict w3c compliance")
+        options.add_experimental_option('w3c', False)
+    return options
+
+
+@pytest.fixture(scope='session')
+def chrome(chrome_options):
+    with browser_.Chrome(options=chrome_options) as browser:
         yield browser
 
 

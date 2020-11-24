@@ -1,7 +1,6 @@
 """BrowserRecorder class for recording snapshots between waits.
 """
 import json
-import os
 import pprint
 import time
 from contextlib import contextmanager
@@ -302,15 +301,7 @@ def _xpath_contains(node, substring):
 
 
 class Chrome(BrowserRecorder, webdriver.Chrome):
-    def __init__(self, *args, options=None, **kwargs):
-        options = options or webdriver.ChromeOptions()
-        if 'CHROME_BIN' in os.environ:
-            options.binary_location = os.environ['CHROME_BIN']
-        if 'NO_HEADLESS' not in os.environ:
-            options.headless = True    # default to what works in CI.
-        if 'W3C_COMPLY' not in os.environ:
-            options.add_experimental_option('w3c', False)
-        super().__init__(*args, options=options, **kwargs)
+    pass
 
 
 class Remote(BrowserRecorder, webdriver.Remote):

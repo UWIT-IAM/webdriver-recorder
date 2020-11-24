@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import NoReturn, Any
 
 import pytest
+from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.command import Command
 
@@ -18,7 +19,16 @@ def url(local_html_path):
 
 
 @pytest.fixture(scope='session')
-def session_browser():
+def chrome_options():
+    options = webdriver.ChromeOptions()
+    options.headless = True
+    options.add_experimental_option('w3c', False)
+    return options
+
+
+
+@pytest.fixture(scope='session')
+def session_browser(chrome_options):
     """Instantiating this is slow; to speed up tests, we'll use a single instance, but clean it up before each test."""
     class TestChrome(Chrome):
         def decrypt(self, encrypted_text):
@@ -32,7 +42,7 @@ def session_browser():
             """
             return encrypted_text.replace('secret-', '')
 
-    return TestChrome()
+    return TestChrome(options=chrome_options)
 
 
 @pytest.fixture
@@ -81,16 +91,16 @@ def test_wait_for_tag(browser):
     assert browser.wait_for_tag('p', 'be boundless')
 
 
-def test_context_stops_client_on_exit(url):
+def test_context_stops_client_on_exit(url, chrome_options):
     class TestChrome(Chrome):
-        def __init__(self):
+        def __init__(self, options):
             self.is_stopped = False
-            super().__init__()
+            super().__init__(options=options)
 
         def stop_client(self):
             self.is_stopped = True
 
-    with TestChrome() as b:
+    with TestChrome(options=chrome_options) as b:
         b.get(url)
 
     assert b.is_stopped
@@ -221,13 +231,6 @@ def test_log_last_http_with_har_no_entries(browser, log_recorder, monkeypatch):
 
     err = BrowserError(browser=browser, message='oh no!')
     assert not log_recorder.messages
-
-
-def test_incorrect_chrome_bin():
-    os.environ['CHROME_BIN'] = '/path/to/chrome'
-    with pytest.raises(WebDriverException):
-        browser = Chrome()
-    del os.environ['CHROME_BIN']
 
 
 def test_incorrect_xpath_contains():
