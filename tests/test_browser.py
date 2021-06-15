@@ -2,53 +2,34 @@ import json
 import os
 import time
 from datetime import datetime
-from typing import NoReturn, Any
+from typing import Any, NoReturn
+from unittest import mock
 
 import pytest
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.command import Command
 
-from webdriver_recorder.browser import Chrome, BrowserError, logger, _xpath_contains, XPathWithSubstringLocator, \
-    Locator, SearchMethod
+from webdriver_recorder.browser import (
+    BrowserError,
+    Chrome,
+    Locator,
+    SearchMethod,
+    XPathWithSubstringLocator,
+    _xpath_contains,
+    logger,
+)
 
 
 @pytest.fixture
 def url(local_html_path):
-    return f'file://{local_html_path}'
+    return f"file://{local_html_path}"
 
 
-@pytest.fixture(scope='session')
-def session_browser():
-    """Instantiating this is slow; to speed up tests, we'll use a single instance, but clean it up before each test."""
-    class TestChrome(Chrome):
-        def decrypt(self, encrypted_text):
-            """This is never actually defined in our classes, which is not good, but appears to be unused. However,
-            its intent seems important enough to leave tested as a stub for now. We can deal with how we want to
-            implement our encryption processes when we actually need this in practice.
-
-            This allows us to test the functional paths, even though there is no actual decryption going on.
-
-            :returns: A string that has trimmed a leading `secret-`. ("secret-foo" becomes "foo")
-            """
-            return encrypted_text.replace('secret-', '')
-
-    return TestChrome()
-
-
-@pytest.fixture
-def browser(session_browser, url) -> Chrome:
-    """
-    Opens the local testing page without the use of snapshots, to keep `pngs` clean.
-    """
-    with session_browser.autocapture_off():
-        session_browser.get(url)
-    yield session_browser
-    session_browser.pngs = []
-
-
-def _fill_in_and_wait(browser: Chrome, value: str, locator: Locator, capture_delay: int = 0) -> Any:
+def _fill_in_and_wait(
+    browser: Chrome, value: str, locator: Locator, capture_delay: int = 0
+) -> Any:
     browser.send_inputs(value)
-    browser.click_button('update')
+    browser.click_button("update")
     return browser.wait_for(locator, capture_delay=capture_delay)
 
 
@@ -59,29 +40,34 @@ def be_boundless_and_wait(browser: Chrome, capture_delay: int = 0) -> NoReturn:
     :param capture_delay:
     :return:
     """
-    return _fill_in_and_wait(browser,
-                             value='be boundless',
-                             locator=XPathWithSubstringLocator(tag='p', displayed_substring='be boundless'),
-                             capture_delay=capture_delay)
+    return _fill_in_and_wait(
+        browser,
+        value="be boundless",
+        locator=XPathWithSubstringLocator(tag="p", displayed_substring="be boundless"),
+        capture_delay=capture_delay,
+    )
 
 
-@pytest.mark.parametrize('locator', [
-    XPathWithSubstringLocator(tag='p', displayed_substring='be boundless'),
-    Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='div#outputDiv'),
-    Locator(search_method=SearchMethod.ID, search_value='outputDiv')
-])
-def test_wait_for(locator, browser):
-    element = _fill_in_and_wait(browser, 'be boundless', locator)
-    assert element.text == 'be boundless'
+@pytest.mark.parametrize(
+    "locator",
+    [
+        XPathWithSubstringLocator(tag="p", displayed_substring="be boundless"),
+        Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="div#outputDiv"),
+        Locator(search_method=SearchMethod.ID, search_value="outputDiv"),
+    ],
+)
+def test_wait_for(locator, browser, load_page):
+    element = _fill_in_and_wait(browser, "be boundless", locator)
+    assert element.text == "be boundless"
 
 
-def test_wait_for_tag(browser):
-    browser.send_inputs('be boundless')
-    browser.click_button('update')
-    assert browser.wait_for_tag('p', 'be boundless')
+def test_wait_for_tag(browser, load_page):
+    browser.send_inputs("be boundless")
+    browser.click_button("update")
+    assert browser.wait_for_tag("p", "be boundless")
 
 
-def test_context_stops_client_on_exit(url):
+def test_context_stops_client_on_exit(url, load_page):
     class TestChrome(Chrome):
         def __init__(self):
             self.is_stopped = False
@@ -96,69 +82,94 @@ def test_context_stops_client_on_exit(url):
     assert b.is_stopped
 
 
-def test_fill_and_clear(browser):
-    browser.send_inputs('boundless')
-    assert browser.switch_to.active_element.get_attribute('value') == 'boundless'
+def test_fill_and_clear(browser, load_page):
+    browser.send_inputs("boundless")
+    assert browser.switch_to.active_element.get_attribute("value") == "boundless"
     browser.clear()
-    assert not browser.switch_to.active_element.get_attribute('value')
+    assert not browser.switch_to.active_element.get_attribute("value")
 
 
-def test_run_commands(browser):
-    browser.run_commands([
-        ('send_inputs', 'boundless'),
-        ('click_button', 'update'),
-        ('wait_for', XPathWithSubstringLocator(tag='p', displayed_substring='boundless'))
-    ])
+def test_run_commands(browser, load_page):
+    browser.run_commands(
+        [
+            ("send_inputs", "boundless"),
+            ("click_button", "update"),
+            (
+                "wait_for",
+                XPathWithSubstringLocator(tag="p", displayed_substring="boundless"),
+            ),
+        ]
+    )
 
 
-def test_snap(browser):
+def test_open_close_tab(browser, load_page):
+    assert len(browser.window_handles) == 2
+    browser.open_tab()
+    assert len(browser.window_handles) == 3
+    browser.close_tab()
+    assert len(browser.window_handles) == 2
+
+
+def test_tab_context(browser, load_page):
+    with pytest.raises(RuntimeError):
+        with browser.tab_context():
+            assert len(browser.window_handles) == 3
+            raise RuntimeError
+    assert len(browser.window_handles) == 2
+
+
+def test_snap(browser, load_page):
     assert not browser.pngs
     browser.snap()
     assert len(browser.pngs) == 1
 
 
-def test_send(browser):
-    time.sleep(.5)
-    browser.send('foo', 'bar')
+def test_send(browser, load_page):
+    time.sleep(0.5)
+    browser.send("foo", "bar")
     browser.snap()
-    assert browser.find_element(value='inputField').get_attribute('value') == 'foo'
-    assert browser.find_element(value='inputField2').get_attribute('value') == 'bar'
+    assert browser.find_element(value="inputField").get_attribute("value") == "foo"
+    assert browser.find_element(value="inputField2").get_attribute("value") == "bar"
 
 
-def test_hide_inputs(browser):
-    assert browser.find_element(value='inputField').get_attribute('type') == 'text'
+def test_hide_inputs(browser, load_page):
+    assert browser.find_element(value="inputField").get_attribute("type") == "text"
     browser.hide_inputs()
-    assert browser.find_element(value='inputField').get_attribute('type') == 'password'
+    assert browser.find_element(value="inputField").get_attribute("type") == "password"
 
 
-def test_autocapture_default(browser):
+def test_autocapture_default(browser, load_page):
     be_boundless_and_wait(browser)
     assert len(browser.pngs) == 2
 
 
-def test_autocapture_off(browser):
+def test_autocapture_off(browser, load_page):
     with browser.autocapture_off():
         be_boundless_and_wait(browser)
     assert not browser.pngs
 
 
-def test_wait_capture_delay(browser):
+def test_wait_capture_delay(browser, load_page):
     start_time = datetime.now()
     delay = 5
     be_boundless_and_wait(browser, capture_delay=delay)
     end_time = datetime.now()
     delta = end_time - start_time
-    assert(delta.seconds) >= delay
+    assert (delta.seconds) >= delay
 
 
 # TODO: (goodtom) The `decrypt` behavior was implemented as abstract but never used; if we ever decide to make
 #       practical use of it, this test should be updated, and the `decrypt()` override should be removed from
 #       our browser test fixture.
-def test_send_secret(browser):
-    time.sleep(.5)
-    browser.send_secret('secret-foo', 'secret-bar')
-    assert browser.find_element(value='inputField').get_attribute('value') == 'foo'
-    assert browser.find_element(value='inputField2').get_attribute('value') == 'bar'
+def test_send_secret(browser, load_page):
+    def decrypt(val: str):
+        return val.replace("secret-", "")
+
+    with mock.patch.object(browser, "decrypt", decrypt):
+        time.sleep(0.5)
+        browser.send_secret("secret-foo", "secret-bar")
+        assert browser.find_element(value="inputField").get_attribute("value") == "foo"
+        assert browser.find_element(value="inputField2").get_attribute("value") == "bar"
 
 
 class LogRecorder:
@@ -169,65 +180,50 @@ class LogRecorder:
 @pytest.fixture
 def log_recorder(monkeypatch):
     recorder = LogRecorder()
-    monkeypatch.setattr(logger, 'error', lambda msg: recorder.messages.append(msg))
+    monkeypatch.setattr(logger, "error", lambda msg: recorder.messages.append(msg))
     return recorder
 
 
 def test_log_last_http_no_har(browser, log_recorder):
-    err = BrowserError(browser=browser, message='oh no!')
+    err = BrowserError(browser=browser, message="oh no!")
     assert not log_recorder.messages
 
 
 def test_log_last_http_empty_har(monkeypatch, browser, log_recorder):
     def patch_get_log(log_type):
-        return ''
+        return ""
 
+    _patch_and_create_browser_error(browser, monkeypatch, patch_get_log)
+    assert not log_recorder.messages
+
+
+def _patch_and_create_browser_error(browser, monkeypatch, patch_get_log):
     actual_execute = browser.execute
 
     def patch_execute(*args, **kwargs):
         if args[0] == Command.GET_AVAILABLE_LOG_TYPES:
-            return {'value': ['har']}
+            return {"value": ["har"]}
         return actual_execute(*args, **kwargs)
 
-    monkeypatch.setattr(browser, 'execute', patch_execute)
-    monkeypatch.setattr(browser, 'get_log', patch_get_log)
+    monkeypatch.setattr(browser, "execute", patch_execute)
+    monkeypatch.setattr(browser, "get_log", patch_get_log)
 
-    err = BrowserError(browser=browser, message='oh no!')
-    assert not log_recorder.messages
+    return BrowserError(browser=browser, message="oh no!")
 
 
 def test_log_last_http_with_har_no_entries(browser, log_recorder, monkeypatch):
     def patch_get_log(log_type):
-        return [
-            {
-                'message': json.dumps({
-                    'log': {
-                        'entries': [
-                        ]
-                    }
-                })
-            }
-        ]
+        return [{"message": json.dumps({"log": {"entries": []}})}]
 
-    actual_execute = browser.execute
-
-    def patch_execute(*args, **kwargs):
-        if args[0] == Command.GET_AVAILABLE_LOG_TYPES:
-            return {'value': ['har']}
-        return actual_execute(*args, **kwargs)
-
-    monkeypatch.setattr(browser, 'execute', patch_execute)
-    monkeypatch.setattr(browser, 'get_log', patch_get_log)
-
-    err = BrowserError(browser=browser, message='oh no!')
+    _patch_and_create_browser_error(browser, monkeypatch, patch_get_log)
     assert not log_recorder.messages
 
 
 def test_incorrect_chrome_bin():
-    os.environ['CHROME_BIN'] = '/path/to/chrome'
+    os.environ["CHROME_BIN"] = "/path/to/chrome"
     with pytest.raises(WebDriverException):
         browser = Chrome()
-    del os.environ['CHROME_BIN']
+    del os.environ["CHROME_BIN"]
 
 
 def test_incorrect_xpath_contains():
@@ -239,28 +235,21 @@ def test_log_last_http_with_har(browser, log_recorder, monkeypatch):
     def patch_get_log(log_type):
         return [
             {
-                'message': json.dumps({
-                    'log': {
-                        'entries': [
-                            'entry #1',
-                            'entry #2',
-                        ]
+                "message": json.dumps(
+                    {
+                        "log": {
+                            "entries": [
+                                "entry #1",
+                                "entry #2",
+                            ]
+                        }
                     }
-                })
+                )
             }
         ]
 
-    actual_execute = browser.execute
+    _patch_and_create_browser_error(browser, monkeypatch, patch_get_log)
 
-    def patch_execute(*args, **kwargs):
-        if args[0] == Command.GET_AVAILABLE_LOG_TYPES:
-            return {'value': ['har']}
-        return actual_execute(*args, **kwargs)
-
-    monkeypatch.setattr(browser, 'execute', patch_execute)
-    monkeypatch.setattr(browser, 'get_log', patch_get_log)
-
-    err = BrowserError(browser=browser, message='oh no!')
     assert len(log_recorder.messages) == 1
     assert log_recorder.messages[0] == "Last HTTP transaction: 'entry #2'"
 
@@ -270,27 +259,28 @@ def test_wrap_exception_no_autocapture(browser):
     with pytest.raises(BrowserError):
         # We should _always_ capture a snap of the page when something goes wrong
         with browser.autocapture_off():
-            with browser.wrap_exception('expected exception'):
-                raise AttributeError('oh noes!')
+            with browser.wrap_exception("expected exception"):
+                raise AttributeError("oh noes!")
     assert len(browser.pngs) == 1
 
 
 def test_locator_defaults():
-    locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='foo')
-    assert locator.search_value == 'foo'
-    assert 'css' in locator.state_description
-    assert 'foo' in locator.state_description
+    locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="foo")
+    assert locator.search_value == "foo"
+    assert "css" in locator.state_description
+    assert "foo" in locator.state_description
 
 
-@pytest.mark.parametrize('wait', [
-    True,
-    False
-])
-def test_click(browser, wait):
-    browser.send_inputs('be boundless')
-    output_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='#outputDiv')
-    button_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value='#doUpdate')
+@pytest.mark.parametrize("wait", [True, False])
+def test_click(browser, wait, load_page):
+    browser.send_inputs("be boundless")
+    output_locator = Locator(
+        search_method=SearchMethod.CSS_SELECTOR, search_value="#outputDiv"
+    )
+    button_locator = Locator(
+        search_method=SearchMethod.CSS_SELECTOR, search_value="#doUpdate"
+    )
     output_element = browser.find_element(*output_locator.payload)
     assert not output_element.text
     browser.click(button_locator, wait=wait)
-    assert output_element.text == 'be boundless'
+    assert output_element.text == "be boundless"
