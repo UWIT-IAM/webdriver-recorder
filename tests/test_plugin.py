@@ -1,32 +1,91 @@
 import json
 import os
 import shutil
+from unittest import mock
 
 import pytest
 
-from webdriver_recorder.browser import XPathWithSubstringLocator
+from webdriver_recorder.browser import Chrome, XPathWithSubstringLocator
 from webdriver_recorder.plugin import lettergen
 
 # Enables testing failure cases in plugin logic by dynamically generating
 # and running plugin tests.
-pytest_plugins = ['pytester']
+pytest_plugins = ["pytester"]
 
-@pytest.fixture(autouse=True)
-def load_page(browser, local_html_path):
-    """
-    Opens the local testing example html without recording any snapshots (in order to keep the `pngs` clean by default).
-    """
-    with browser.autocapture_off():  # Don't generate any PNGs as part of the autoused fixture.
-        browser.get(f'file://{local_html_path}')
 
-def test_happy_chrome(chrome):
+@pytest.fixture
+def chrome(browser) -> Chrome:
+    yield browser
+
+
+def test_happy_chrome(chrome, load_page):
     """
     A simple test case to ensure the fixture itself works; the heavy lifting is all tested in the browser tests.
     """
     _test_happy_case(chrome)
 
 
-def test_browser_error_failure_reporting(chrome, testdir, local_html_path, report_dir):
+def test_browser_context(browser, browser_context):
+    mock_get_patcher = mock.patch.object(browser, "get")
+    mock_get = mock_get_patcher.start()
+    mock_get = mock.patch.object(browser, "get").start()
+    mock_delete_cookies_patcher = mock.patch.object(browser, "delete_all_cookies")
+    mock_delete_cookies = mock_delete_cookies_patcher.start()
+    try:
+        with browser_context(
+            cookie_urls=["https://idp.uw.edu/signout", "https://identity.uw.edu/logout"]
+        ) as browser:
+            browser.get("https://identity.uw.edu")
+            mock_get.assert_called_once_with("https://identity.uw.edu")
+
+        assert mock_get.call_count == 3
+        # Despite only 2 cookies being passed above, the context
+        # always calls the delete_all_cookies method on the
+        # current domain, which brings the total to 3.
+        assert mock_delete_cookies.call_count == 3
+        mock_get.assert_called_with("https://identity.uw.edu/logout")
+    finally:
+        mock_get_patcher.stop()
+        mock_delete_cookies_patcher.stop()
+
+
+@pytest.fixture(scope="class")
+def track_tabs(request, class_browser):
+    request.cls.pre_test_tab_count = len(class_browser.window_handles)
+
+
+@pytest.mark.usefixtures("class_browser", "track_tabs")
+class TestClassBrowser:
+    def validate_new_tab_state(self):
+        assert len(self.browser.window_handles) == self.pre_test_tab_count + 1
+        assert self.browser.get_cookie("foo")["value"] == "bar"
+        assert self.browser.current_url == "https://www.example.com/"
+
+    @pytest.mark.external
+    def test_browser_new_tab(self):
+        # At the beginning of the test, the "root" tab for the session will be open
+        # as well as the "root" tab for the class.
+        assert len(self.browser.window_handles) == self.pre_test_tab_count
+        self.browser.get("https://www.washington.edu")
+        assert self.browser.current_url == "https://www.washington.edu/"
+        # We'll open another tab that we'll expect to be preserved.
+        self.browser.open_tab()
+        self.browser.get("https://www.example.com")
+        self.browser.add_cookie({"name": "foo", "value": "bar"})
+        self.validate_new_tab_state()
+
+    @pytest.mark.external
+    def test_browser_close_tab(self):
+        # Validate that nothing was auto-closed between tests
+        self.validate_new_tab_state()
+        self.browser.close_tab()
+        assert len(self.browser.window_handles) == self.pre_test_tab_count
+        assert self.browser.current_url == "https://www.washington.edu/"
+
+
+def test_browser_error_failure_reporting(
+    chrome, testdir, local_html_path, report_generator, load_page
+):
     """
     This uses the pytester plugin to execute ad-hoc tests in a new testing instance. This is the only way to test
     the logic of fixtures after their included `yield` statement, and is what the pytester plugin was designed to do.
@@ -43,18 +102,19 @@ def test_browser_error_failure_reporting(chrome, testdir, local_html_path, repor
             raise BrowserError(browser, 'forced failure')
         """
     )
-    result = testdir.runpytest('--report-dir', report_dir)
-    expected_slug = 'test_browser_error_failure_reporting-py--test_force_failure'
+    result = testdir.runpytest("--report-dir", report_generator)
+    expected_slug = "test_browser_error_failure_reporting-py--test_force_failure"
     result.assert_outcomes(failed=1)
-    expected_filename = os.path.join(report_dir,
-                                     f'result.{expected_slug}.html')
+    expected_filename = os.path.join(report_generator, f"result.{expected_slug}.html")
     with open(expected_filename) as f:
         result = json.loads(f.read())
 
-    assert result['failure']['message'] == 'forced failure'
+    assert result["failure"]["message"] == "forced failure"
 
 
-def test_failure_reporting(chrome, testdir, local_html_path, report_dir):
+def test_failure_reporting(
+    chrome, testdir, local_html_path, report_generator, load_page
+):
     """
     Similar to test_browser_error_failure_reporting, but with a generic AssertionError. This is what we would expect
     to see under most failure circumstances.
@@ -69,26 +129,27 @@ def test_failure_reporting(chrome, testdir, local_html_path, report_dir):
             assert False
         """
     )
-    result = testdir.runpytest('--report-dir', report_dir)
-    expected_slug = 'test_failure_reporting-py--test_force_failure'
+    result = testdir.runpytest("--report-dir", report_generator)
+    expected_slug = "test_failure_reporting-py--test_force_failure"
     result.assert_outcomes(failed=1)
-    expected_filename = os.path.join(report_dir,
-                                     f'result.{expected_slug}.html')
+    expected_filename = os.path.join(report_generator, f"result.{expected_slug}.html")
     with open(expected_filename) as f:
         result = json.loads(f.read())
 
-    assert 'AssertionError' in result['failure']['message']
+    assert "AssertionError" in result["failure"]["message"]
 
 
-def test_report_generator(browser, report_generator, testdir, local_html_path):
+def test_report_generator(
+    browser, generate_report, testdir, local_html_path, load_page
+):
     """
     While the report generator could be tested by invoking directly, this test adds an extra layer of ensuring
     the correct default behavior is to write the report even if the test itself fails.
     """
-    report_dir = os.path.join(os.getcwd(), 'tmp', 'test-report')
+    report_dir = os.path.join(os.getcwd(), "tmp", "test-report")
     os.makedirs(report_dir, exist_ok=True)
     try:
-        expected_filename = os.path.join(report_dir, 'index.html')
+        expected_filename = os.path.join(report_dir, "index.html")
         assert not os.path.exists(expected_filename)
         testdir.makepyfile(
             f"""
@@ -100,8 +161,8 @@ def test_report_generator(browser, report_generator, testdir, local_html_path):
                 browser.snap()
             """
         )
-        result = testdir.runpytest('--report-dir', report_dir)
-        expected_filename = os.path.join(report_dir, 'index.html')
+        result = testdir.runpytest("--report-dir", report_dir)
+        expected_filename = os.path.join(report_dir, "index.html")
         assert os.path.exists(expected_filename)
     finally:
         shutil.rmtree(report_dir)
@@ -109,22 +170,18 @@ def test_report_generator(browser, report_generator, testdir, local_html_path):
 
 def test_lettergen():
     sequence = list(zip(lettergen(), list(range(1, 73715))))
-    assert sequence[0] == ('A', 1)
-    assert sequence[-1] == ('DEAD', 73714)
-
-
-@pytest.mark.xfail(reason="The remote fixture is hard to test because it requires a locally running selenium instance, "
-                          "which itself requires extra dependencies and configuration. "
-                          "As long as we don't have anything relying on this, it's probably more trouble than "
-                          "it's worth to setup.")
-def test_happy_remote_chrome(remote_chrome):
-    _test_happy_case(remote_chrome)
+    assert sequence[0] == ("A", 1)
+    assert sequence[-1] == ("DEAD", 73714)
 
 
 # The underscore here keeps pytest from executing this as a test itself.
 def _test_happy_case(browser):
-    browser.wait_for(XPathWithSubstringLocator(tag='button', displayed_substring='update'))
-    browser.send_inputs('boundless')
-    browser.click_button('update')
-    browser.wait_for(XPathWithSubstringLocator(tag='p', displayed_substring='boundless'))
+    browser.wait_for(
+        XPathWithSubstringLocator(tag="button", displayed_substring="update")
+    )
+    browser.send_inputs("boundless")
+    browser.click_button("update")
+    browser.wait_for(
+        XPathWithSubstringLocator(tag="p", displayed_substring="boundless")
+    )
     assert len(browser.pngs) == 3
