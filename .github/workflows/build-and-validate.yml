@@ -2,7 +2,9 @@ name: Build and validate plugin
 on:
   pull_request:
   push:
-    branches: test-pull-request-workflow
+    branches:
+     - test-build-and-validate-workflow
+     - main
 
 jobs:
   validate:
