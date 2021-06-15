@@ -1,0 +1,25 @@
+name: Build and validate plugin
+on:
+  pull_request:
+  push:
+    branches:
+     - test-build-and-validate-workflow
+     - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - uses: abatilo/actions-poetry@v2.0.0
+      - uses: nanasess/setup-chromedriver@v1.0.5
+      - run: poetry install
+      - run: poetry run tox
+      - if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Test reports for ${{ github.sha }}
+          path: ./webdriver-report/index.html
