@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "webdriver-recorder"
+version = "4.0.0-rc.1"
+description = "A pytest plugin for recording screenshots of selenium interactions, with other convenient features too."
+authors = ["Tom Thorogood <goodtom@uw.edu>"]
+license = "Apache Software License 3.0"
+classifiers = [
+    "Framework :: Pytest",
+    'License :: OSI Approved :: Apache Software License',
+]
+packages = [
+    { include = "webdriver_recorder" }
+]
+
+[tool.poetry.plugins.pytest11]
+"uw-webdriver-recorder" = "webdriver_recorder.plugin"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+pytest = "^6.2.4"  # NOT a dev dependency, as this is a plugin for pytest!
+Jinja2 = "^3.0.1"
+selenium = "^3.141.0"
+pydantic = "^1.8.2"
+
+[tool.poetry.dev-dependencies]
+tox = "^3.23.1"
+coverage = "^5.5"
+pytest-coverage = "^0.0"
+flake8 = "^3.9.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+markers = [
+        "external: marks test that call an external endpoint. Deselect with '-m not external'"
+]
