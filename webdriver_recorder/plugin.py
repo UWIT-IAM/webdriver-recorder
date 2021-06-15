@@ -198,7 +198,7 @@ def browser(browser_context) -> Chrome:
 
 @pytest.fixture(scope="session")
 def report_dir(request):
-    return request.config.getooption("report_dir")
+    return request.config.getoption("report_dir")
 
 
 @pytest.fixture(scope="session", autouse=True)

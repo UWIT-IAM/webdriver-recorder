@@ -170,14 +170,32 @@ CHROME_BIN="/path/to/google-chrome-stable" pytest
 
 ### Periodic Setup
 
+#### Updating Chromedriver
+
 Once in a while you will need to re-run the 
 `Set your chromedriver directory` and `Bootstrap chromedriver` 
 steps above, because chromedriver will fall out of date 
 with the Chrome binary. 
 
+#### Updating dependencies
+
+`poetry update && poetry lock`
+
+### Releasing Changes
+
+Release changes using poetry: 
+
+- `poetry update`
+- `poetry lock`  
+- `poetry version [patch|minor|major|prerelease]`
+- `tox`
+- `poetry publish --build`
+  - username: `uw-it-iam`
+  - password: Ask @tomthorogood!
+
 ### Testing Changes
 
-Simply run `tox`
+Simply run `tox` (or, `poetry run tox`)
 
 ### Submitting Pull Requests
 
