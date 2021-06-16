@@ -148,7 +148,7 @@ jobs:
             ${{ env.action_desc }} release
             <${{ env.release_url }} | ${{ env.release_version }}>
 
-      - run: poetry publish
+      - run: poetry publish --build
         if: env.dry_run != 'true'
         id: publish-release
 
