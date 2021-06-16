@@ -128,7 +128,7 @@ jobs:
           allowUpdates: true
           artifacts: ./webdriver-report
           tag: ${{ steps.configure.outputs.release-version }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
       - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
         env:
           release_version: ${{ steps.configure.outputs.release-version }}
