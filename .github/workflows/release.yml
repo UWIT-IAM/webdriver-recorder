@@ -10,12 +10,13 @@ on:
       patch-level:
         default: prerelease
         required: true
-        description: "either an explicit version or a hint
-                      to poetry from patch|minor|major|prerelease;"
+        description: "VERSION INSTRUCTION. (Can be an explicit version or a hint
+                      to poetry from patch|minor|major|prerelease)"
       dry-run:
         required: true
         default: 'true'
-        description: Change this to 'false' if you are sure you want to release!
+        description: >
+          DRY RUN? (Change this to 'false' if you are sure you want to release!)
 
 env:
   workflow_url: >
