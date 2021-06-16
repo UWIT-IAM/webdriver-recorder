@@ -50,7 +50,7 @@ jobs:
           python-version: 3.7
 
       - uses: abatilo/actions-poetry@v2.1.2
-        -
+
       - uses: nanasess/setup-chromedriver@v1.0.5
 
       - run: |
@@ -117,9 +117,11 @@ jobs:
           step-status: ${{ env.test-status }}, ${{ env.release-status }}
 
       - uses: EndBug/add-and-commit@v7.2.1
+        id: update-project-version
         env:
           commit-message: >
-            Tag new version ${{ steps.configure.outputs.release-version }}
+            Update pyproject.toml version to
+            ${{ steps.configure.outputs.release-version }}
         with:
           add: pyproject.toml poetry.lock
           pull_strategy: NO-PULL
@@ -151,7 +153,7 @@ jobs:
 
       - if: always()
         env:
-          status: ${{ steps.publish-release.outcome != 'failure' && 'succeeded' || 'failed' }}
+          status: ${{ job.status != 'failure' && 'succeeded' || 'failed' }}
         with:
           command: update-workflow
           step-id: release
