@@ -134,6 +134,7 @@ jobs:
         id: create-release
         with:
           token: ${{ github.token }}
+          commit: ${{ github.sha }}
           tag: ${{ steps.configure.outputs.release-version }}
 
       - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
