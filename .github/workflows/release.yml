@@ -133,7 +133,6 @@ jobs:
         if: env.dry_run != 'true'
         id: create-release
         with:
-          artifacts: ./webdriver-report
           token: ${{ github.token }}
           tag: ${{ steps.configure.outputs.release-version }}
 
