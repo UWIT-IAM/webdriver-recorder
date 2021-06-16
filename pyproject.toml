@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "uw-webdriver-recorder"
-version = "4.0.0-rc.7"
+version = "4.0.0-rc.8"
 description = "A pytest plugin for recording screenshots of selenium interactions, with other convenient features too."
 authors = ["Tom Thorogood <goodtom@uw.edu>"]
 license = "Apache Software License 3.0"
