@@ -192,6 +192,29 @@ with the Chrome binary.
 
 ### Releasing Changes
 
+To release a change out in the wild, you should use
+the Github Actions UI.
+
+1. Visit the [release workflow UI]
+2. Click on `Run Workflow`
+3. Select the branch you want to release.
+4. Leave the `dry-run` option set to `true`.
+5. Click `Run`
+
+Wait for the dry run to complete in the `#iam-bots` slack channel.
+
+If the dry run succeeded, validate the generated version number is what you expected 
+and, if so, repeat steps 1–3 above, but change the `dry-run` option to `false`.
+
+**This means you can create prereleases for any branch you're working on to test it 
+with another package, before merging into `master`!**
+
+
+#### Manual Release
+
+If you want to release something without the use of
+Github Actions, you can follow these steps:
+
 Release changes using poetry: 
 
 - `poetry update`
@@ -201,7 +224,7 @@ Release changes using poetry:
 - `poetry publish --build`
   - username: `uw-it-iam`
   - password: Ask @tomthorogood!
-
+  
 ### Testing Changes
 
 `poetry run tox` (or simply `tox` if you are already in the `poetry shell`)
@@ -211,3 +234,6 @@ Release changes using poetry:
 - (Recommended) Run [black](https://github.com/psf/black) -- this will
   be automated in the future: `black webdriver_recorder/*.py tests/*.py`
 - Run validations before submitting using `tox`; this will prevent unnecessary churn in your pull request.
+
+
+[release workflow ui]: https://github.com/UWIT-IAM/webdriver-recorder/actions/workflows/release.yml

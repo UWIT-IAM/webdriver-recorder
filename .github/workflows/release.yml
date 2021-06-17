@@ -10,12 +10,13 @@ on:
       patch-level:
         default: prerelease
         required: true
-        description: "either an explicit version or a hint
-                      to poetry from patch|minor|major|prerelease;"
+        description: "VERSION INSTRUCTION. (Can be an explicit version or a hint
+                      to poetry from patch|minor|major|prerelease)"
       dry-run:
         required: true
         default: 'true'
-        description: Change this to 'false' if you are sure you want to release!
+        description: >
+          DRY RUN? (Change this to 'false' if you are sure you want to release!)
 
 env:
   workflow_url: >
@@ -35,22 +36,23 @@ jobs:
           then
             echo 'dry_run=false' >> $GITHUB_ENV
           fi
-      - if: >
-          (github.event_name == 'push'
-          && github.ref == 'refs/heads/test-release-workflow')
-          || github.event.inputs.dry-run == 'true'
-        run: echo 'dry_run=true' >> $GITHUB_ENV
+
       - uses: actions/checkout@v2
+
       - with:
           project_id: ${{ secrets.IAM_GCR_REPO }}
           service_account_key: ${{ secrets.GCR_TOKEN }}
           export_default_credentials: true
         uses: google-github-actions/setup-gcloud@master
+
       - uses: actions/setup-python@v2
         with:
           python-version: 3.7
+
       - uses: abatilo/actions-poetry@v2.1.2
+
       - uses: nanasess/setup-chromedriver@v1.0.5
+
       - run: |
           poetry version ${{ github.event.inputs.patch-level || 'prerelease' }}
           set -x
@@ -61,6 +63,7 @@ jobs:
           poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
           echo "SLACK_CANVAS_ID=${{ github.event_name }}/$VERSION" >> $GITHUB_ENV
         id: configure
+
       - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
         with:
           command: create-canvas
@@ -99,8 +102,10 @@ jobs:
             <${{ env.workflow_url }} | Workflow> triggered by ${{ github.actor }}
             from a ${{ github.event_name }} at
             <${{ env.commit_url }} | commit ${{ steps.configure.outputs.short-sha }}>
+
       - run: poetry run tox
         id: run-tests
+
       - if: always()
         uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
         env:
@@ -110,25 +115,32 @@ jobs:
           command: update-workflow
           step-id: run-tests, release
           step-status: ${{ env.test-status }}, ${{ env.release-status }}
-      - uses: EndBug/add-and-commit@v7
+
+      - uses: EndBug/add-and-commit@v7.2.1
+        id: update-project-version
         env:
           commit-message: >
-            Tag new version ${{ steps.configure.outputs.release-version }}
+            Update pyproject.toml version to
+            ${{ steps.configure.outputs.release-version }}
         with:
           add: pyproject.toml poetry.lock
-          pull-strategy: NO-PULL
+          pull_strategy: NO-PULL
           push: ${{ env.dry_run == 'true' && 'false' || 'true' }}
           default_author: github_actor
           message: ${{ env.commit-message }}
-          tag: ${{ steps.configure.outputs.release-version }}
-      - uses: actions/create-release@v1.1.4
+
+      - id: version-commit
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+        shell: bash
+
+      - uses: ncipollo/release-action@v1.8.6
         if: env.dry_run != 'true'
         id: create-release
         with:
-          allowUpdates: true
-          artifacts: ./webdriver-report
+          token: ${{ github.token }}
+          commit: ${{ steps.version-commit.outputs.sha }}
           tag: ${{ steps.configure.outputs.release-version }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
         env:
           release_version: ${{ steps.configure.outputs.release-version }}
@@ -139,24 +151,28 @@ jobs:
           description: >
             ${{ env.action_desc }} release
             <${{ env.release_url }} | ${{ env.release_version }}>
-      - run: poetry publish
+
+      - run: poetry publish --build
         if: env.dry_run != 'true'
         id: publish-release
+
       - if: always()
         env:
-          status: ${{ steps.publish-release.outcome != 'failure' && 'succeeded' || 'failed' }}
+          status: ${{ job.status != 'failure' && 'succeeded' || 'failed' }}
         with:
           command: update-workflow
           step-id: release
           step-status: ${{ env.status }}
           workflow-status: ${{ env.status }}
         uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+
       - if: always()
         uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
         with:
           command: remove-step
           step-id: '*'
           step-status: succeeded
+
       - if: always()
         uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
         with:
