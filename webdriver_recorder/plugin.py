@@ -16,7 +16,7 @@ import pytest
 from pydantic import BaseModel, root_validator
 from selenium import webdriver
 
-from .browser import BrowserError, Chrome, Remote
+from .browser import BrowserError, BrowserRecorder, Chrome, Remote
 
 TEMPLATE_FILE = os.path.join(
     os.path.abspath(os.path.dirname(__file__)), "report.template.html"
@@ -33,7 +33,7 @@ def pytest_addoption(parser):
         "--selenium-server",
         action="store",
         dest="selenium_server",
-        default=os.environ.get("SELENIUM_SERVER"),
+        default=os.environ.get("SELENIUM_SERVER", "").strip() or None,
         help="Remote selenium webdriver to connect to (eg localhost:4444)",
     )
     group.addoption(
@@ -112,7 +112,7 @@ class ReportResult(object):
 
 @pytest.fixture(scope="session")
 def selenium_server(request) -> Optional[str]:
-    return request.config.getoption("selenium_server", None)
+    return request.config.getoption("selenium_server", os.environ.get('SELENIUM_SERVER', None))
 
 
 @pytest.fixture(scope="session")
@@ -217,7 +217,7 @@ def report_generator(generate_report, report_dir) -> str:
 
 
 @pytest.fixture(autouse=True)
-def report_test(report_generator, request, session_browser):
+def report_test(report_generator, request):
     """
     Print the results to report_file after a test run. Without this, the results of the test will not be saved.
     You can ensure this is always run by including the following in your conftest.py:
@@ -273,7 +273,7 @@ def report_test(report_generator, request, session_browser):
         link=slug,
         doc=doc,
         nodeid=nodeid,
-        pngs=session_browser.pngs,
+        pngs=BrowserRecorder.pngs,
         failure=failure,
         time1=time1,
         time2=time2,
@@ -286,7 +286,7 @@ def report_test(report_generator, request, session_browser):
         fd.write(header.json())
     with open(filename, "w") as fd:
         fd.write(report.json())
-    session_browser.pngs.clear()
+    BrowserRecorder.pngs.clear()
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -314,11 +314,11 @@ def lettergen():
 
 @pytest.fixture(scope="session")
 def report_title(request, session_browser) -> str:
-    return request.config.getoption("report_title", session_browser.current_url)
+    return request.config.getoption("report_title", default="Webdriver Recorder Summary")
 
 
 @pytest.fixture(scope="session", autouse=True)
-def generate_report(template_filename, session_browser, report_title, report_dir):
+def generate_report(template_filename, report_title, report_dir):
     """
     Uses the included HTML template to generate the final report, using the results found in `report_dir`. Can be
     called explicitly in order to do this at any time.
