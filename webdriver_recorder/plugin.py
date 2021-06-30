@@ -33,7 +33,7 @@ def pytest_addoption(parser):
         "--selenium-server",
         action="store",
         dest="selenium_server",
-        default=os.environ.get("SELENIUM_SERVER", "").strip() or None,
+        default=None,
         help="Remote selenium webdriver to connect to (eg localhost:4444)",
     )
     group.addoption(
@@ -112,7 +112,15 @@ class ReportResult(object):
 
 @pytest.fixture(scope="session")
 def selenium_server(request) -> Optional[str]:
-    return request.config.getoption("selenium_server", os.environ.get('SELENIUM_SERVER', None))
+    """Returns a non-empty string or None"""
+    return (
+        # CLI arg takes precedence
+        request.config.getoption("selenium_server")
+        # Otherwise, we look for a non-empty string
+        or os.environ.get('SELENIUM_SERVER', '').strip()
+        # If the result is still Falsey, we always return None.
+        or None
+    )
 
 
 @pytest.fixture(scope="session")
