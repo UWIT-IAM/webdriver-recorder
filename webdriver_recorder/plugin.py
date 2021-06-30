@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import jinja2
 import pytest
+from _pytest.fixtures import FixtureRequest
 from pydantic import BaseModel, root_validator
 from selenium import webdriver
 
@@ -154,7 +155,7 @@ def session_browser(selenium_server, chrome_options):
 
 
 @pytest.fixture(scope="session")
-def browser_context(session_browser) -> Callable[..., Chrome]:
+def browser_context(request: FixtureRequest) -> Callable[..., Chrome]:
     """
     This fixture allows you to create a fresh context for a given
     browser instance.
@@ -176,7 +177,11 @@ def browser_context(session_browser) -> Callable[..., Chrome]:
     def inner(
         browser: Optional[Chrome] = None, cookie_urls: Optional[List[str]] = None
     ):
-        browser = browser or session_browser
+        if not browser:
+            # Only loads this fixture if no override is present
+            # to avoid creating session_browsers if the
+            # dependent does not to.
+            browser = request.getfixturevalue('session_browser')
         browser.open_tab()
         cookie_urls = cookie_urls or []
         try:
@@ -199,7 +204,13 @@ def class_browser(request, browser_context) -> Chrome:
 
 
 @pytest.fixture
-def browser(browser_context) -> Chrome:
+def browser(browser_context) -> BrowserRecorder:
+    """
+    The default browser fixture. This default behavior will lazily
+    instantiate a `session_browser` if one does not exist. To
+    override this behavior and create your own context, you can
+    redefine this fixture.
+    """
     with browser_context() as browser:
         yield browser
 
@@ -321,7 +332,7 @@ def lettergen():
 
 
 @pytest.fixture(scope="session")
-def report_title(request, session_browser) -> str:
+def report_title(request) -> str:
     return request.config.getoption("report_title", default="Webdriver Recorder Summary")
 
 
