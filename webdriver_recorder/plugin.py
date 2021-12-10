@@ -23,8 +23,6 @@ TEMPLATE_FILE = os.path.join(
     os.path.abspath(os.path.dirname(__file__)), "report.template.html"
 )
 
-log = logging.getLogger(__name__)
-
 _here = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -34,14 +32,17 @@ def pytest_addoption(parser):
         "--selenium-server",
         action="store",
         dest="selenium_server",
-        default=None,
+        default=os.environ.get('REMOTE_SELENIUM'),
         help="Remote selenium webdriver to connect to (eg localhost:4444)",
     )
     group.addoption(
         "--report-dir",
         action="store",
         dest="report_dir",
-        default=os.path.join(os.getcwd(), "webdriver-report"),
+        default=os.environ.get(
+            'REPORT_DIR',
+            os.path.join(os.getcwd(), "webdriver-report")
+        ),
         help="The path to the directory where artifacts should be stored.",
     )
     group.addoption(
@@ -132,10 +133,11 @@ def template_filename():
 @pytest.fixture(scope="session")
 def chrome_options():
     options = webdriver.ChromeOptions()
-    options.headless = True
-    options.add_experimental_option("w3c", False)
+    options.add_argument('--headless')
     options.add_argument("--incognito")
     options.add_argument("--disable-application-cache")
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
     return options
 
 

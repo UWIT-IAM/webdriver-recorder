@@ -237,7 +237,7 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         chain.send_keys(Keys.TAB.join(strings)).perform()
 
     def send_inputs(self, *strings):
-        elements = self.find_elements_by_css_selector("input")
+        elements = self.find_elements(By.TAG_NAME, 'input')
         for element, string in zip(elements, strings):
             element.send_keys(string)
 
@@ -354,14 +354,8 @@ def _xpath_contains(node, substring):
 
 
 class Chrome(BrowserRecorder, webdriver.Chrome):
-    def __init__(self, *args, options=None, **kwargs):
-        if not options:
-            options = webdriver.ChromeOptions()
-            options.binary_location = os.environ.get("CHROME_BIN")
-            options.headless = True  # default to what works in CI.
-            options.add_experimental_option("w3c", False)
-        super().__init__(*args, options=options, **kwargs)
+    pass
 
 
 class Remote(BrowserRecorder, webdriver.Remote):
-    capabilities = DesiredCapabilities
+    pass

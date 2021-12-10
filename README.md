@@ -19,12 +19,33 @@ poetry add 'uw-webdriver-recorder>=4.0.0,<5.0.0'
 
 ## Requirements
 
-`chromedriver` must be discoverable on your test environment PATH. See [Google's 
-documentation](https://chromedriver.chromium.org/).
+The following table illustrates the compatible versions between
+this (webdriver-recorder), python, and selenium:
+
+| webdriver-recorder version | python version(s) | selenium version(s)
+| --- | --- | --- |
+| <4.0 | 3+ | <=3.141.59
+| 4.0 | 3.6+ | <=3.141.59 |
+| 4.1+ | 3.6+ | \>=4.1 |
+
+
+If running without docker, `chromedriver` must be 
+discoverable on your test environment PATH. 
+See [Google's documentation](https://chromedriver.chromium.org/).
+
+## Running the Examples
+
+You can use docker-compose to run the example tests:
+
+```
+TEST_DIR=./examples docker-compose up --build
+```
 
 ## Pytest Arguments
 
 ### `--report-dir`
+
+Also as environment variable: `REPORT_DIR`
 
 (Optional). If provided, will override the default (`./webdriver-report`). 
 This is the directory where worker locks and report artifacts will be stored.
@@ -42,9 +63,9 @@ test fixture. See [report_title](#report_title)
 
 ### `--selenium-server`
 
-(Optional). Defaults to the `SELENIUM_SERVER` environment variable value, which may 
-be blank. If not blank, a `Remote` instance will be created instead that will 
-connect to the server provided.
+(Optional). Defaults to the `REMOTE_SELENIUM` environment variable value, 
+which may be blank. If not blank, a `Remote` instance 
+will be created instead that will connect to the server provided.
 
 ## Browser/WebDriver Fixtures
 
@@ -161,7 +182,7 @@ def report_title():
 - `poetry env use /path/to/python3.6+`
 
 It is **highly recommended** that you use a [pyenv](https://github.com/pyenv/pyenv) version, e.g.:
-`poetry env use ~/.pyenv/versions/3.7.7/bin/python`
+`poetry env use ~/.pyenv/versions/3.8.8/bin/python`
 
 - Set your chromedriver directory: 
   `export CHROMEDRIVER_DIR="$(poetry env list --full-path | cut -f1 -d' ')/bin"`
@@ -180,6 +201,8 @@ CHROME_BIN="/path/to/google-chrome-stable" pytest
 ### Periodic Setup
 
 #### Updating Chromedriver
+
+(Only required if running without Docker)
 
 Once in a while you will need to re-run the 
 `Set your chromedriver directory` and `Bootstrap chromedriver` 
