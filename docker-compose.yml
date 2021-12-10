@@ -1,0 +1,29 @@
+# You can use this composition to run tests
+# backed by webdriver-recorder. This is helpful if your
+# test suite is simple and has no additional dependencies.
+# TEST_DIR=/path/to/your/tests docker-compose up --build.
+version: '3'
+services:
+  selenium:
+    image: selenium/standalone-chrome:4.1
+    ports:
+      - 4444:4444
+      - 7900:7900
+    logging:
+      driver: "none"
+  test-runner:
+    image: ghcr.io/uwit-iam/webdriver-recorder:latest
+    build:
+      dockerfile: Dockerfile
+      context: .
+    environment:
+      REMOTE_SELENIUM: selenium:4444
+      TZ: America/Los_Angeles
+      TEST_DIR: ${TEST_DIR}
+      REPORT_DIR: /webdriver-report
+    volumes:
+      - ./webdriver-report:/webdriver-report
+      - ${TEST_DIR}:/tests
+    depends_on:
+      - selenium
+    command: pytest -o log_cli=true -o log_cli_level=error /tests
