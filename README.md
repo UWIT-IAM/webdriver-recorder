@@ -26,7 +26,7 @@ this (webdriver-recorder), python, and selenium:
 | --- | --- | --- |
 | <4.0 | 3+ | <=3.141.59
 | 4.0 | 3.6+ | <=3.141.59 |
-| 4.1+ | 3.6+ | \>=4.1 |
+| 4.1+ | 3.6+ | \>=5.0 |
 
 
 If running without docker, `chromedriver` must be 
@@ -73,12 +73,24 @@ This plugin makes several fixtures available to you:
 
 ### `session_browser`
 
-A session-scoped browser instance.
+A session-scoped browser instance. By default, this is always invoked, 
+which may pose runtime errors (like stuck tests) if you have a constrained
+selenium grid. You can disable this default behavior by 
+setting `disable_session_browser=1` in your environment.
+
+Note that you may still invoke the session_browser fixture with this option, 
+but it will not automatically be used.
 
 ```
 def test_a_thing(session_browser):
     session_browser.get('https://www.example.com')
+    
+def test_another_thing(session_browser):
+    # The page remains loaded from the previous test.
+    assert session_browser.wait_for_tag('h1', 'welcome to example.com')
 ```
+
+See also [browser](#browser).
 
 ### `class_browser`
 
@@ -87,34 +99,54 @@ the entire test class. The `class_browser` will always be open
 to a new, clean tab, which will be closed when all tests
 in the class have run.
 
+
+If you run with `disable_session_browser`, the class_browser will be a fresh
+instance of the browser for each class where it is used.
+
 ```
 @pytest.mark.usefixtures('class_browser')
 class TestCollection:
+    @pytest.fixture(autouse=True)
+    def initialize_collection(class_browser): 
+        self.browser = class_browser
+        
     def test_a_thing(self):
         self.browser.get('https://www.example.com')
+        
+    def test_another_thing(self):
+        assert self.browser.wait_for_tag('h1', 'welcome to example.com')
 ```
 
 ### `browser`
 
-A function-scoped browser instance. Each test function 
-that uses this fixture will have a fresh, clean tab, which
-will be closed when the test function has completed.
+A function-scoped browser tab that automatically cleans up after itself before the 
+tab is closed by deleting browser cookies from its last visited domain.
 
+If running with `disable_session_browser`, a new instance will be created for each 
+browser instead. This may have performance impacts, but also guarantees the 
+"cleanest" browser experience.
 
 ### `browser_context`
 
 If you do not want to use one of the above scopes, you 
 can use the `browser_context` fixture directly, which 
-creates and cleans up a tab for your scope.
+creates and cleans up a tab for the browser instance you provide. 
 
 When the scope exits, the tab's cookies are deleted, and the tab is closed.
 You can optionally supply a list of additional urls to visit and clear cookies using 
-the `cookie_urls` parameter. The default behavior (from Selenium) is to only delete
-the cookies of the _current_ domain.
+the `cookie_urls` parameter. (The default browser behavior is to only delete
+the cookies of the _current_ domain.)
 
 ```
-def test_a_thing(browser_context):
-    with browser_context(cookie_urls=['https://www.example.com/']) as browser:
+def test_a_thing(browser_context, chrome_options):
+    # Let's create a custom instance of Chrome
+    options.add_argument('--hide-scrollbars')
+    browser = Chrome(options=chrome_options)
+    
+    with browser_context(
+        browser, 
+        cookie_urls=['https://www.example.com/']
+    ) as browser:
         browser.get('https://www.example.com/')
         browser.add_cookie({'name': 'foo', 'value': 'bar'})
         browser.get('https://www.uw.edu/')
@@ -125,17 +157,6 @@ def test_a_thing(browser_context):
     browser.get('https://www.example.com/')
     assert not browser.get_all_cookies()
 ```
-
-Calling `browser_context()` without arguments will use the `session_browser` 
-by default; you may pass in your own instance if you choose to.
-
-```
-def test_a_thing(browser_context):
-    fresh = webdriver_recorder.Chrome()
-    with browser_context(fresh) as superfresh:
-        superfresh.get('https://www.example.com')
-```
-
 
 ## Settings Fixtures
 
@@ -163,8 +184,8 @@ def chrome_options(chrome_options):
 ### `report_title`
 
 Use this to change the title of your report. This is a better option
-than the pytest argument (above) for cases where the title isn't 
-expected to change much.
+than the pytest argument (above) for cases where you want to 
+programmatically assemble the title during test setup.
 
 ```
 @pytest.fixture(scope='session')
@@ -178,36 +199,19 @@ def report_title():
 ### First-time developer setup
 
 - Install [poetry](https://python-poetry.org) (if not already done)
-- `poetry install`
 - `poetry env use /path/to/python3.6+`
+- `poetry install`
+- Run `./bootstrap_chromedriver.sh` -- doing this _after_ poetry setup will 
+  automatically install to your poetry environment.
 
 It is **highly recommended** that you use a [pyenv](https://github.com/pyenv/pyenv) version, e.g.:
 `poetry env use ~/.pyenv/versions/3.8.8/bin/python`
-
-- Set your chromedriver directory: 
-  `export CHROMEDRIVER_DIR="$(poetry env list --full-path | cut -f1 -d' ')/bin"`
-- Bootstrap chromedriver:
-   - On **MacOS**: `CHROMEDRIVER_DIST=mac64 ./bootstrap_chromedriver.sh`
-   - On **Linux**: `./bootstrap_chromedriver.sh`
-   - On **Windows**: _Feel free to submit a pull request!_
-
-If your system has chrome installed somewhere undiscoverable, you can explicitly provide the correct path by
-setting the CHROME_BIN environment variable:
-
-```
-CHROME_BIN="/path/to/google-chrome-stable" pytest
-```
 
 ### Periodic Setup
 
 #### Updating Chromedriver
 
-(Only required if running without Docker)
-
-Once in a while you will need to re-run the 
-`Set your chromedriver directory` and `Bootstrap chromedriver` 
-steps above, because chromedriver will fall out of date 
-with the Chrome binary. 
+Just re-run `./bootstrap_chromedriver.sh`
 
 #### Patch dependencies
 
@@ -230,7 +234,7 @@ If the dry run succeeded, validate the generated version number is what you expe
 and, if so, repeat steps 1–3 above, but change the `dry-run` option to `false`.
 
 **This means you can create prereleases for any branch you're working on to test it 
-with another package, before merging into `master`!**
+with another package, before merging into `main`!**
 
 
 #### Manual Release
@@ -243,20 +247,18 @@ Release changes using poetry:
 - `poetry update`
 - `poetry lock`  
 - `poetry version [patch|minor|major|prerelease]`
-- `tox`
+- `poetry run tox`
 - `poetry publish --build`
   - username: `uw-it-iam`
-  - password: Ask @tomthorogood!
+  - password: Ask @tomthorogood! (goodtom@uw.edu)
   
 ### Testing Changes
 
 `poetry run tox` (or simply `tox` if you are already in the `poetry shell`)
 
+
 ### Submitting Pull Requests
 
-- (Recommended) Run [black](https://github.com/psf/black) -- this will
-  be automated in the future: `black webdriver_recorder/*.py tests/*.py`
 - Run validations before submitting using `tox`; this will prevent unnecessary churn in your pull request.
-
 
 [release workflow ui]: https://github.com/UWIT-IAM/webdriver-recorder/actions/workflows/release.yml
