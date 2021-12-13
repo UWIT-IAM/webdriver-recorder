@@ -29,7 +29,10 @@ def test_browser_context(browser, browser_context):
     try:
         with browser_context(
             browser,
-            cookie_urls=["https://idp.uw.edu/signout", "https://identity.uw.edu/logout"]
+            cookie_urls=[
+                "https://idp.uw.edu/signout",
+                "https://identity.uw.edu/logout",
+            ],
         ) as browser:
             browser.get("https://identity.uw.edu")
             mock_get.assert_called_once_with("https://identity.uw.edu")
@@ -77,9 +80,7 @@ class TestClassBrowser:
         assert self.browser.current_url == "https://www.washington.edu/"
 
 
-def test_browser_error_failure_reporting(
-    testdir, local_html_path, report_generator
-):
+def test_browser_error_failure_reporting(testdir, local_html_path, report_generator):
     """
     This uses the pytester plugin to execute ad-hoc tests in a new testing instance. This is the only way to test
     the logic of fixtures after their included `yield` statement, and is what the pytester plugin was designed to do.
@@ -106,9 +107,7 @@ def test_browser_error_failure_reporting(
     assert result["failure"]["message"] == "forced failure"
 
 
-def test_failure_reporting(
-    testdir, local_html_path, report_generator
-):
+def test_failure_reporting(testdir, local_html_path, report_generator):
     """
     Similar to test_browser_error_failure_reporting, but with a generic AssertionError. This is what we would expect
     to see under most failure circumstances.
@@ -134,7 +133,8 @@ def test_failure_reporting(
 
 
 def test_report_generator(
-    testdir, local_html_path,
+    testdir,
+    local_html_path,
 ):
     """
     While the report generator could be tested by invoking directly, this test adds an extra layer of ensuring

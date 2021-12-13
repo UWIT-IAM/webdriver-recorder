@@ -235,7 +235,7 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         chain.send_keys(Keys.TAB.join(strings)).perform()
 
     def send_inputs(self, *strings):
-        elements = self.find_elements(By.TAG_NAME, 'input')
+        elements = self.find_elements(By.TAG_NAME, "input")
         for element, string in zip(elements, strings):
             element.send_keys(string)
 

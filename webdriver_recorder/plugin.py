@@ -31,7 +31,7 @@ def pytest_addoption(parser):
         "--selenium-server",
         action="store",
         dest="selenium_server",
-        default=os.environ.get('REMOTE_SELENIUM'),
+        default=os.environ.get("REMOTE_SELENIUM"),
         help="Remote selenium webdriver to connect to (eg localhost:4444)",
     )
     group.addoption(
@@ -39,8 +39,7 @@ def pytest_addoption(parser):
         action="store",
         dest="report_dir",
         default=os.environ.get(
-            'REPORT_DIR',
-            os.path.join(os.getcwd(), "webdriver-report")
+            "REPORT_DIR", os.path.join(os.getcwd(), "webdriver-report")
         ),
         help="The path to the directory where artifacts should be stored.",
     )
@@ -118,7 +117,7 @@ def selenium_server(request) -> Optional[str]:
         # CLI arg takes precedence
         request.config.getoption("selenium_server")
         # Otherwise, we look for a non-empty string
-        or os.environ.get('SELENIUM_SERVER', '').strip()
+        or os.environ.get("SELENIUM_SERVER", "").strip()
         # If the result is still Falsey, we always return None.
         or None
     )
@@ -151,11 +150,11 @@ def chrome_options() -> webdriver.ChromeOptions:
 
     # Our default options promote a balance between
     # performance and test isolation.
-    options.add_argument('--headless')
+    options.add_argument("--headless")
     options.add_argument("--incognito")
     options.add_argument("--disable-application-cache")
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     return options
 
 
@@ -227,6 +226,7 @@ class _Settings(BaseSettings):
 
 
 if _Settings().disable_session_browser:
+
     @pytest.fixture
     def browser(chrome_options) -> BrowserRecorder:
         """Creates a fresh instance of the browser using the configured chrome_options fixture."""
@@ -243,6 +243,7 @@ if _Settings().disable_session_browser:
         yield browser
 
 else:
+
     @pytest.fixture
     def browser(session_browser, browser_context) -> BrowserRecorder:
         """
@@ -253,7 +254,7 @@ else:
         with browser_context(session_browser) as browser:
             yield browser
 
-    @pytest.fixture(scope='class')
+    @pytest.fixture(scope="class")
     def class_browser(request, session_browser, browser_context):
         """
         Creates a class-scoped tab context and binds it to the requesting class
@@ -385,7 +386,9 @@ def lettergen():
 
 @pytest.fixture(scope="session")
 def report_title(request) -> str:
-    return request.config.getoption("report_title", default="Webdriver Recorder Summary")
+    return request.config.getoption(
+        "report_title", default="Webdriver Recorder Summary"
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)

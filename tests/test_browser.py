@@ -26,7 +26,7 @@ def url(local_html_path):
 
 @pytest.fixture
 def session_browser_disabled() -> bool:
-    return os.environ.get('disable_session_browser', '').lower() in ('1', 'true')
+    return os.environ.get("disable_session_browser", "").lower() in ("1", "true")
 
 
 def _fill_in_and_wait(
