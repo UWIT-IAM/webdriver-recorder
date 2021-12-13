@@ -8,18 +8,31 @@ on:
 
 jobs:
   validate:
+    container:
+      image: ghcr.io/uwit-iam/poetry:latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.8
-      - uses: abatilo/actions-poetry@v2.1.2
-      - uses: nanasess/setup-chromedriver@v1.0.5
       - run: poetry install
-      - run: poetry run tox
+      - run: tox
+        id: tox
       - if: always()
+        run: |
+          if [[ -d "./webdriver-report" ]]
+          then
+              echo "::set-output name=upload-webdriver-report::true"
+          fi
+          if [[ -d "./htmlcov" ]]
+          then
+              echo "::set-output name=upload-coverage-report::true"
+          fi
+      - if: always() && steps.tox.outputs.upload-webdriver-report
         uses: actions/upload-artifact@v2
         with:
-          name: Test reports for ${{ github.sha }}
+          name: web test storyboards for for ${{ github.sha }}
           path: ./webdriver-report/index.html
+      - if: always() && steps.tox.outputs.upload-coverage-report
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage report for ${{ github.sha }}
+          path: ./htmlcov

@@ -123,8 +123,11 @@ A function-scoped browser tab that automatically cleans up after itself before t
 tab is closed by deleting browser cookies from its last visited domain.
 
 If running with `disable_session_browser`, a new instance will be created for each 
-browser instead. This may have performance impacts, but also guarantees the 
-"cleanest" browser experience.
+browser instead. This has significant performance impacts\*, but also guarantees the 
+"cleanest" browser experience. 
+
+\* see [Performance](#performance)
+
 
 ### `browser_context`
 
@@ -262,3 +265,15 @@ Release changes using poetry:
 - Run validations before submitting using `tox`; this will prevent unnecessary churn in your pull request.
 
 [release workflow ui]: https://github.com/UWIT-IAM/webdriver-recorder/actions/workflows/release.yml
+
+## Performance
+
+Creating browser instances is very inefficient. It is recommended that you 
+use the default behavior that configures a single browser instance
+to use for all tests, that comes with an auto-managed context
+for the `browser` fixture. 
+
+In our own `tox` tests, you can observe the performance impact
+directly. The `disable_session_browser` tox environment typically
+takes more than double the amount of time to run than the same tests
+using the default behavior.
