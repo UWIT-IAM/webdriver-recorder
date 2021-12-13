@@ -13,8 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import jinja2
 import pytest
-from _pytest.fixtures import FixtureRequest
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, BaseSettings, root_validator
 from selenium import webdriver
 
 from .browser import BrowserError, BrowserRecorder, Chrome, Remote
@@ -131,8 +130,27 @@ def template_filename():
 
 
 @pytest.fixture(scope="session")
-def chrome_options():
+def chrome_options() -> webdriver.ChromeOptions:
+    """
+    An extensible instance of ChromeOptions with default
+    options configured for a balance between performance
+    and test isolation.
+
+    You can extend this:
+        @pytest.fixture(scope='session')
+        def chrome_options(chrome_options) -> ChromeOptions:
+            chrome_options.add_argument("--option-name")
+            return chrome_options
+
+    or override it entirely:
+        @pytest.fixture(scope='session')
+        def chrome_options() -> ChromeOptions:
+            return ChromeOptions()
+    """
     options = webdriver.ChromeOptions()
+
+    # Our default options promote a balance between
+    # performance and test isolation.
     options.add_argument('--headless')
     options.add_argument("--incognito")
     options.add_argument("--disable-application-cache")
@@ -142,7 +160,13 @@ def chrome_options():
 
 
 @pytest.fixture(scope="session")
-def session_browser(selenium_server, chrome_options):
+def session_browser(selenium_server, chrome_options) -> BrowserRecorder:
+    """
+    A browser instance that is kept open for the entire test run.
+    Only instantiated if it is used, but by default will be used in both the
+    'browser' and 'class_browser' fixtures, unless "disable_session_browser=1"
+    is set in the environment.
+    """
     if selenium_server and selenium_server.strip():  # pragma: no cover
         logging.info(f"Creating connection to remote selenium server {selenium_server}")
         browser = Remote(
@@ -157,7 +181,7 @@ def session_browser(selenium_server, chrome_options):
 
 
 @pytest.fixture(scope="session")
-def browser_context(request: FixtureRequest) -> Callable[..., Chrome]:
+def browser_context() -> Callable[..., Chrome]:
     """
     This fixture allows you to create a fresh context for a given
     browser instance.
@@ -177,13 +201,8 @@ def browser_context(request: FixtureRequest) -> Callable[..., Chrome]:
 
     @contextmanager
     def inner(
-        browser: Optional[Chrome] = None, cookie_urls: Optional[List[str]] = None
-    ):
-        if not browser:
-            # Only loads this fixture if no override is present
-            # to avoid creating session_browsers if the
-            # dependent does not to.
-            browser = request.getfixturevalue('session_browser')
+        browser: BrowserRecorder, cookie_urls: Optional[List[str]] = None
+    ) -> BrowserRecorder:
         browser.open_tab()
         cookie_urls = cookie_urls or []
         try:
@@ -198,23 +217,54 @@ def browser_context(request: FixtureRequest) -> Callable[..., Chrome]:
     return inner
 
 
-@pytest.fixture(scope="class")
-def class_browser(request, browser_context) -> Chrome:
-    with browser_context() as browser:
+class _Settings(BaseSettings):
+    """
+    Automatically derives from environment and
+    translates truthy/falsey strings into bools
+    """
+
+    disable_session_browser: bool = False
+
+
+if _Settings().disable_session_browser:
+    @pytest.fixture
+    def browser(chrome_options) -> BrowserRecorder:
+        """Creates a fresh instance of the browser using the configured chrome_options fixture."""
+        yield Chrome(options=chrome_options)
+
+    @pytest.fixture(scope="class")
+    def class_browser(chrome_options, request) -> Chrome:
+        """
+        Creates a fresh instance of the browser for use in the requesting class, using the configure
+        chrome_options fixture.
+        """
+        browser = Chrome(options=chrome_options)
         request.cls.browser = browser
         yield browser
 
+else:
+    @pytest.fixture
+    def browser(session_browser, browser_context) -> BrowserRecorder:
+        """
+        Creates a function-scoped tab context for the session_browser which cleans
+        up after itself (to the best of its ability). If you need a fresh instance
+        each test, you can set `disable_session_browser=1` in your environment.
+        """
+        with browser_context(session_browser) as browser:
+            yield browser
 
-@pytest.fixture
-def browser(browser_context) -> BrowserRecorder:
-    """
-    The default browser fixture. This default behavior will lazily
-    instantiate a `session_browser` if one does not exist. To
-    override this behavior and create your own context, you can
-    redefine this fixture.
-    """
-    with browser_context() as browser:
-        yield browser
+    @pytest.fixture(scope='class')
+    def class_browser(request, session_browser, browser_context):
+        """
+        Creates a class-scoped tab context and binds it to the requesting class
+        as 'self.browser'; this tab will close once all tests in the class have run,
+        and will clean up after itself (to the best of its ability). If you need
+        a fresh browser instance for each class, you can set `disable_session_browser=1` in your
+        environment.
+        """
+        with browser_context(session_browser) as browser:
+            request.cls.browser = browser
+            yield browser
 
 
 @pytest.fixture(scope="session")

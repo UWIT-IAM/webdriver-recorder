@@ -6,7 +6,6 @@ from typing import Any, NoReturn
 from unittest import mock
 
 import pytest
-from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.command import Command
 
 from webdriver_recorder.browser import (
@@ -23,6 +22,11 @@ from webdriver_recorder.browser import (
 @pytest.fixture
 def url(local_html_path):
     return f"file://{local_html_path}"
+
+
+@pytest.fixture
+def session_browser_disabled() -> bool:
+    return os.environ.get('disable_session_browser', '').lower() in ('1', 'true')
 
 
 def _fill_in_and_wait(
@@ -67,11 +71,11 @@ def test_wait_for_tag(browser, load_page):
     assert browser.wait_for_tag("p", "be boundless")
 
 
-def test_context_stops_client_on_exit(url, load_page):
+def test_context_stops_client_on_exit(url, chrome_options, load_page):
     class TestChrome(Chrome):
         def __init__(self):
             self.is_stopped = False
-            super().__init__()
+            super().__init__(options=chrome_options)
 
         def stop_client(self):
             self.is_stopped = True
@@ -102,20 +106,26 @@ def test_run_commands(browser, load_page):
     )
 
 
-def test_open_close_tab(browser, load_page):
-    assert len(browser.window_handles) == 2
+def test_open_close_tab(browser, session_browser_disabled, load_page):
+    offset = 0
+    if session_browser_disabled:
+        offset = 1
+    assert len(browser.window_handles) == 2 - offset
     browser.open_tab()
-    assert len(browser.window_handles) == 3
+    assert len(browser.window_handles) == 3 - offset
     browser.close_tab()
-    assert len(browser.window_handles) == 2
+    assert len(browser.window_handles) == 2 - offset
 
 
-def test_tab_context(browser, load_page):
+def test_tab_context(browser, session_browser_disabled, load_page):
+    offset = 0
+    if session_browser_disabled:
+        offset = 1
     with pytest.raises(RuntimeError):
         with browser.tab_context():
-            assert len(browser.window_handles) == 3
+            assert len(browser.window_handles) == 3 - offset
             raise RuntimeError
-    assert len(browser.window_handles) == 2
+    assert len(browser.window_handles) == 2 - offset
 
 
 def test_snap(browser, load_page):
@@ -217,13 +227,6 @@ def test_log_last_http_with_har_no_entries(browser, log_recorder, monkeypatch):
 
     _patch_and_create_browser_error(browser, monkeypatch, patch_get_log)
     assert not log_recorder.messages
-
-
-def test_incorrect_chrome_bin():
-    os.environ["CHROME_BIN"] = "/path/to/chrome"
-    with pytest.raises(WebDriverException):
-        browser = Chrome()
-    del os.environ["CHROME_BIN"]
 
 
 def test_incorrect_xpath_contains():

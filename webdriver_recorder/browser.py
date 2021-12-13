@@ -1,20 +1,18 @@
 """BrowserRecorder class for recording snapshots between waits.
 """
 import json
-import os
 import pprint
 import time
 from contextlib import contextmanager
 from enum import Enum
 from logging import getLogger
-from typing import Optional, List, Tuple, TypeVar
+from typing import List, Optional, Tuple, TypeVar
 
 import selenium.webdriver.remote.webdriver
 from pydantic import BaseModel, Field
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait

@@ -13,16 +13,11 @@ from webdriver_recorder.plugin import lettergen
 pytest_plugins = ["pytester"]
 
 
-@pytest.fixture
-def chrome(browser) -> Chrome:
-    yield browser
-
-
-def test_happy_chrome(chrome, load_page):
+def test_happy_chrome(browser, load_page):
     """
     A simple test case to ensure the fixture itself works; the heavy lifting is all tested in the browser tests.
     """
-    _test_happy_case(chrome)
+    _test_happy_case(browser)
 
 
 def test_browser_context(browser, browser_context):
@@ -33,6 +28,7 @@ def test_browser_context(browser, browser_context):
     mock_delete_cookies = mock_delete_cookies_patcher.start()
     try:
         with browser_context(
+            browser,
             cookie_urls=["https://idp.uw.edu/signout", "https://identity.uw.edu/logout"]
         ) as browser:
             browser.get("https://identity.uw.edu")
@@ -61,7 +57,6 @@ class TestClassBrowser:
         assert self.browser.get_cookie("foo")["value"] == "bar"
         assert self.browser.current_url == "https://www.example.com/"
 
-    @pytest.mark.external
     def test_browser_new_tab(self):
         # At the beginning of the test, the "root" tab for the session will be open
         # as well as the "root" tab for the class.
@@ -74,7 +69,6 @@ class TestClassBrowser:
         self.browser.add_cookie({"name": "foo", "value": "bar"})
         self.validate_new_tab_state()
 
-    @pytest.mark.external
     def test_browser_close_tab(self):
         # Validate that nothing was auto-closed between tests
         self.validate_new_tab_state()
@@ -84,7 +78,7 @@ class TestClassBrowser:
 
 
 def test_browser_error_failure_reporting(
-    chrome, testdir, local_html_path, report_generator, load_page
+    testdir, local_html_path, report_generator
 ):
     """
     This uses the pytester plugin to execute ad-hoc tests in a new testing instance. This is the only way to test
@@ -113,7 +107,7 @@ def test_browser_error_failure_reporting(
 
 
 def test_failure_reporting(
-    chrome, testdir, local_html_path, report_generator, load_page
+    testdir, local_html_path, report_generator
 ):
     """
     Similar to test_browser_error_failure_reporting, but with a generic AssertionError. This is what we would expect
@@ -124,8 +118,8 @@ def test_failure_reporting(
         from webdriver_recorder.browser import BrowserError
         import pytest
 
-        def test_force_failure(browser, report_test):
-            browser.get("file://{local_html_path}")
+        def test_force_failure(session_browser, report_test):
+            session_browser.get("file://{local_html_path}")
             assert False
         """
     )
@@ -140,7 +134,7 @@ def test_failure_reporting(
 
 
 def test_report_generator(
-    browser, generate_report, testdir, local_html_path, load_page
+    testdir, local_html_path,
 ):
     """
     While the report generator could be tested by invoking directly, this test adds an extra layer of ensuring
@@ -153,12 +147,11 @@ def test_report_generator(
         assert not os.path.exists(expected_filename)
         testdir.makepyfile(
             f"""
-            from webdriver_recorder.browser import BrowserError
             import pytest
 
-            def test_force_failure(browser, report_test):
-                browser.get("file://{local_html_path}")
-                browser.snap()
+            def test_force_failure(session_browser, report_test):
+                session_browser.get("file://{local_html_path}")
+                session_browser.snap()
             """
         )
         result = testdir.runpytest("--report-dir", report_dir)
