@@ -38,7 +38,7 @@ See [Google's documentation](https://chromedriver.chromium.org/).
 You can use docker-compose to run the example tests:
 
 ```
-TEST_DIR=./examples docker-compose up --build
+test_dir=./examples docker-compose up --build
 ```
 
 ## Pytest Arguments

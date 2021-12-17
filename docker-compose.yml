@@ -12,18 +12,23 @@ services:
     logging:
       driver: "none"
   test-runner:
-    image: ghcr.io/uwit-iam/webdriver-recorder:latest
     build:
       dockerfile: Dockerfile
       context: .
     environment:
       REMOTE_SELENIUM: selenium:4444
       TZ: America/Los_Angeles
-      TEST_DIR: ${TEST_DIR}
+      test_dir: ${test_dir}
       REPORT_DIR: /webdriver-report
+      COVERAGE_FILE: /coverage/.coverage
+      disable_session_browser: ${disable_session_browser}
+      pytest_args: ${pytest_args}
     volumes:
       - ./webdriver-report:/webdriver-report
-      - ${TEST_DIR}:/tests
+      - ./coverage:/coverage
+      - ${test_dir}:/tests
     depends_on:
       - selenium
-    command: pytest -o log_cli=true -o log_cli_level=error /tests
+    command: >
+      coverage run -a --source=webdriver_recorder
+      -m pytest -o log_cli=true -o log_cli_level=error ${pytest_args} /tests

@@ -1,0 +1,27 @@
+@startuml
+'https://plantuml.com/component-diagram
+
+
+package "docker host" {
+    [/Users/example/tests]
+    [/Users/example/webdriver-report]
+    [/Users/example/htmlcov]
+
+    package "docker-compose" {
+        package test-runner {
+            [/webdriver-report]
+            [/coverage-report]
+            [/tests]
+        }
+        [selenium]
+
+    }
+
+}
+
+[/Users/example/tests] --> [/tests]
+[/Users/example/webdriver-report] --> [/webdriver-report]
+[/Users/example/htmlcov] --> [/coverage-report]
+
+
+@enduml

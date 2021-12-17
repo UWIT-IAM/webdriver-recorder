@@ -169,12 +169,8 @@ def test_lettergen():
 
 # The underscore here keeps pytest from executing this as a test itself.
 def _test_happy_case(browser):
-    browser.wait_for(
-        XPathWithSubstringLocator(tag="button", displayed_substring="update")
-    )
+    browser.wait_for(XPathWithSubstringLocator(tag="button", displayed_substring="update"))
     browser.send_inputs("boundless")
     browser.click_button("update")
-    browser.wait_for(
-        XPathWithSubstringLocator(tag="p", displayed_substring="boundless")
-    )
+    browser.wait_for(XPathWithSubstringLocator(tag="p", displayed_substring="boundless"))
     assert len(browser.pngs) == 3

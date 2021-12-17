@@ -24,14 +24,7 @@ def url(local_html_path):
     return f"file://{local_html_path}"
 
 
-@pytest.fixture
-def session_browser_disabled() -> bool:
-    return os.environ.get("disable_session_browser", "").lower() in ("1", "true")
-
-
-def _fill_in_and_wait(
-    browser: Chrome, value: str, locator: Locator, capture_delay: int = 0
-) -> Any:
+def _fill_in_and_wait(browser, value: str, locator: Locator, capture_delay: int = 0) -> Any:
     browser.send_inputs(value)
     browser.click_button("update")
     return browser.wait_for(locator, capture_delay=capture_delay)
@@ -277,12 +270,8 @@ def test_locator_defaults():
 @pytest.mark.parametrize("wait", [True, False])
 def test_click(browser, wait, load_page):
     browser.send_inputs("be boundless")
-    output_locator = Locator(
-        search_method=SearchMethod.CSS_SELECTOR, search_value="#outputDiv"
-    )
-    button_locator = Locator(
-        search_method=SearchMethod.CSS_SELECTOR, search_value="#doUpdate"
-    )
+    output_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="#outputDiv")
+    button_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="#doUpdate")
     output_element = browser.find_element(*output_locator.payload)
     assert not output_element.text
     browser.click(button_locator, wait=wait)

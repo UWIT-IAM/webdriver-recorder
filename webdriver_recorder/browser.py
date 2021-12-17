@@ -100,9 +100,7 @@ class XPathWithSubstringLocator(Locator):
         )
 
 
-WebDriverType = TypeVar(
-    "WebDriverType", bound=selenium.webdriver.remote.webdriver.WebDriver
-)
+WebDriverType = TypeVar("WebDriverType", bound=selenium.webdriver.remote.webdriver.WebDriver)
 
 
 class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
@@ -180,9 +178,7 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         """
         return self.click_tag("button", substring, **kwargs)
 
-    def wait_for(
-        self, locator: Locator, timeout: Optional[int] = None, capture_delay: int = 0
-    ):
+    def wait_for(self, locator: Locator, timeout: Optional[int] = None, capture_delay: int = 0):
         """Wait for tag containing substring to show up in the DOM."""
         if timeout is None:
             timeout = getattr(self, "default_wait", 5)
@@ -342,9 +338,7 @@ class BrowserError(Exception):
 
 
 def _xpath_contains(node, substring):
-    lc_translate = (
-        "translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
-    )
+    lc_translate = "translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
     if '"' in substring:
         raise ValueError("double quotes in substring not supported")
     substring = substring.lower()

@@ -5,24 +5,50 @@ import json
 import logging
 import os
 import re
+import secrets
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from string import ascii_uppercase
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import jinja2
 import pytest
-from pydantic import BaseModel, BaseSettings, root_validator
+from pydantic import BaseModel, BaseSettings, root_validator, validator
 from selenium import webdriver
+from webdriver_recorder.plugin import ResultHeader
 
 from .browser import BrowserError, BrowserRecorder, Chrome, Remote
 
-TEMPLATE_FILE = os.path.join(
-    os.path.abspath(os.path.dirname(__file__)), "report.template.html"
-)
+TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), "report.template.html")
 
 _here = os.path.abspath(os.path.dirname(__file__))
+
+logger = logging.getLogger(__name__)
+
+
+class EnvSettings(BaseSettings):
+    """
+    Automatically derives from environment variables and
+    translates truthy/falsey strings into bools. Only required
+    for code that must be conditionally loaded; all others
+    should be part of 'pytest_addoption()'
+    """
+
+    # If set to True, will generate a new browser instance within every request
+    # for a given scope, instead of only creating a single instance and generating
+    # contexts for each test.
+    # This has a significant performance impact,
+    # but sometimes cannot be avoided.
+    disable_session_browser: Optional[bool] = False
+
+    @validator("*", pre=True)
+    def handle_empty_string(cls, v):
+        if not v:
+            return None
+
+
+_SETTINGS = EnvSettings()
 
 
 def pytest_addoption(parser):
@@ -38,9 +64,7 @@ def pytest_addoption(parser):
         "--report-dir",
         action="store",
         dest="report_dir",
-        default=os.environ.get(
-            "REPORT_DIR", os.path.join(os.getcwd(), "webdriver-report")
-        ),
+        default=os.environ.get("REPORT_DIR", os.path.join(os.getcwd(), "webdriver-report")),
         help="The path to the directory where artifacts should be stored.",
     )
     group.addoption(
@@ -81,6 +105,7 @@ class ResultFailure(HTMLEscapeBaseModel):
 
 
 class ResultAttributes(HTMLEscapeBaseModel):
+    header: ResultHeader
     link: str
     doc: Optional[str]
     nodeid: str
@@ -113,14 +138,10 @@ class ReportResult(object):
 @pytest.fixture(scope="session")
 def selenium_server(request) -> Optional[str]:
     """Returns a non-empty string or None"""
-    return (
-        # CLI arg takes precedence
-        request.config.getoption("selenium_server")
-        # Otherwise, we look for a non-empty string
-        or os.environ.get("SELENIUM_SERVER", "").strip()
-        # If the result is still Falsey, we always return None.
-        or None
-    )
+    value = request.config.getoption("selenium_server")
+    if value:
+        return value.strip()
+    return None
 
 
 @pytest.fixture(scope="session")
@@ -159,20 +180,43 @@ def chrome_options() -> webdriver.ChromeOptions:
 
 
 @pytest.fixture(scope="session")
-def session_browser(selenium_server, chrome_options) -> BrowserRecorder:
+def browser_args(selenium_server, chrome_options) -> Dict[str, Optional[Union[webdriver.ChromeOptions, str]]]:
+    args = {"options": chrome_options}
+    if selenium_server:
+        args["command_executor"] = f"http://{selenium_server}/wd/hub"
+    return args
+
+
+@pytest.fixture(scope="session")
+def browser_class(browser_args) -> Type[BrowserRecorder]:
+    if browser_args.get("command_executor"):
+        return Remote
+    return Chrome
+
+
+@pytest.fixture(scope="session")
+def build_browser(browser_args, browser_class) -> Callable[..., BrowserRecorder]:
+    logger.info(
+        "Browser generator will build instances using the following settings:\n"
+        f"   Browser class: {browser_class.__name__}\n"
+        f"   Browser args: {dict(browser_args)}"
+    )
+
+    def inner() -> BrowserRecorder:
+        return browser_class(**browser_args)
+
+    return inner
+
+
+@pytest.fixture(scope="session")
+def session_browser(build_browser) -> BrowserRecorder:
     """
     A browser instance that is kept open for the entire test run.
     Only instantiated if it is used, but by default will be used in both the
     'browser' and 'class_browser' fixtures, unless "disable_session_browser=1"
     is set in the environment.
     """
-    if selenium_server and selenium_server.strip():  # pragma: no cover
-        logging.info(f"Creating connection to remote selenium server {selenium_server}")
-        browser = Remote(
-            options=chrome_options, command_executor=f"http://{selenium_server}/wd/hub"
-        )
-    else:
-        browser = Chrome(options=chrome_options)
+    browser = build_browser()
     try:
         yield browser
     finally:
@@ -199,9 +243,7 @@ def browser_context() -> Callable[..., Chrome]:
     """
 
     @contextmanager
-    def inner(
-        browser: BrowserRecorder, cookie_urls: Optional[List[str]] = None
-    ) -> BrowserRecorder:
+    def inner(browser: BrowserRecorder, cookie_urls: Optional[List[str]] = None) -> BrowserRecorder:
         browser.open_tab()
         cookie_urls = cookie_urls or []
         try:
@@ -216,33 +258,36 @@ def browser_context() -> Callable[..., Chrome]:
     return inner
 
 
-class _Settings(BaseSettings):
-    """
-    Automatically derives from environment and
-    translates truthy/falsey strings into bools
-    """
-
-    disable_session_browser: bool = False
-
-
-if _Settings().disable_session_browser:
+if _SETTINGS.disable_session_browser:
+    logger.info("Disabling auto-use of 'session_browser', this may significantly decrease test performance.")
 
     @pytest.fixture
-    def browser(chrome_options) -> BrowserRecorder:
+    def browser(build_browser) -> BrowserRecorder:
         """Creates a fresh instance of the browser using the configured chrome_options fixture."""
-        yield Chrome(options=chrome_options)
+        browser = build_browser()
+        try:
+            yield browser
+        finally:
+            browser.quit()
 
     @pytest.fixture(scope="class")
-    def class_browser(chrome_options, request) -> Chrome:
+    def class_browser(build_browser, request) -> BrowserRecorder:
         """
         Creates a fresh instance of the browser for use in the requesting class, using the configure
         chrome_options fixture.
         """
-        browser = Chrome(options=chrome_options)
+        browser = build_browser()
         request.cls.browser = browser
-        yield browser
+        try:
+            yield browser
+        finally:
+            browser.quit()
 
 else:
+    logger.info(
+        "Enabling auto-use of 'session_browser'; if your tests appear stuck, try disabling "
+        "by setting 'disable_session_browser=1' in your environment."
+    )
 
     @pytest.fixture
     def browser(session_browser, browser_context) -> BrowserRecorder:
@@ -255,7 +300,7 @@ else:
             yield browser
 
     @pytest.fixture(scope="class")
-    def class_browser(request, session_browser, browser_context):
+    def class_browser(request, session_browser, browser_context) -> BrowserRecorder:
         """
         Creates a class-scoped tab context and binds it to the requesting class
         as 'self.browser'; this tab will close once all tests in the class have run,
@@ -270,50 +315,63 @@ else:
 
 @pytest.fixture(scope="session")
 def report_dir(request):
-    return request.config.getoption("report_dir")
+    dir_ = request.config.getoption("report_dir")
+    os.makedirs(dir_, exist_ok=True)
+    return dir_
 
 
-@pytest.fixture(scope="session", autouse=True)
-def report_generator(generate_report, report_dir) -> str:
-    """Fixture returning the directory containing our report files. Overridable using `--report-dir`"""
-    os.makedirs(report_dir, exist_ok=True)
+@pytest.fixture(scope='session')
+def worker_file(report_dir):
     worker_file = tempfile.mktemp(prefix="worker.", dir=report_dir)
     Path(worker_file).touch()
     try:
-        yield report_dir
+        yield worker_file
     finally:
+        try:
+            os.remove(worker_file)
+        except Exception as e:
+            logger.exception(e)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def report_generator(generate_report, report_dir, session_results) -> str:
+    """Fixture returning the directory containing our report files. Overridable using `--report-dir`"""
+    worker_file = tempfile.mktemp(prefix="worker.", dir=report_dir)
+    try:
+        yield
+    finally:
+        if session_results:
+            with open(os.path.join(f'results.{worker_file}.json', 'wb')) as f:
+                f.write(session_results.json())
         os.remove(worker_file)
         workers = list(f for f in os.listdir(report_dir) if f.startswith("worker."))
         if not workers:
             generate_report()
 
 
+class SessionResults(BaseModel):
+    results: List[ResultAttributes] = []
+
+
+@pytest.fixture(scope='session', autouse=True)
+def session_results() -> SessionResults:
+    return SessionResults()
+
+
 @pytest.fixture(autouse=True)
-def report_test(report_generator, request):
+def report_test(report_generator, request, session_results):
     """
     Print the results to report_file after a test run. Without this, the results of the test will not be saved.
-    You can ensure this is always run by including the following in your conftest.py:
-
-    @pytest.fixture(autouse=True)
-    def report_test(report_test):
-        return report_test
     """
     time1 = str(datetime.datetime.now())
-    yield
-    time2 = str(datetime.datetime.now())
     try:
-        # TODO: Sometimes this line causes problems, but I can't
-        #       remember the context surrounding it. I think if there
-        #       is an error setting up a test fixture, `report_call` is not
-        #       defined, or something. Anyway, it'd be a great
-        #       to figure out a graceful solution.
-        #       In the meantime this'll be nicer output.
-        nodeid = request.node.report_call.report.nodeid
-    except Exception:  # pragma: no cover
-        logging.error(
-            f"Unable to extract nodeid from node: {request.node}; "
-            "not preparing report segment"
-        )
+        yield
+    finally:
+        time2 = str(datetime.datetime.now())
+    if hasattr(request.node, 'report_call'):
+        node_id = request.node.report_call.report.nodeid
+    else:
+        logging.error(f"Unable to extract nodeid from node: {request.node}; " "not preparing report segment")
         return
     is_failed = request.node.report_call.report.failed
     # TODO: Figure out a way to include class docs if they exist
@@ -326,8 +384,8 @@ def report_test(report_generator, request):
     #               do_work('bop')
     #   The report output should then read "When foo is bar and baz is bop"
     doc = request.node.report_call.doc
-    slug = re.sub(r"\W", "-", nodeid)
-    header = ResultHeader(link=slug, is_failed=is_failed, description=nodeid)
+    slug = re.sub(r"\W", "-", node_id)
+    header = ResultHeader(link=slug, is_failed=is_failed, description=node_id)
     failure = None
     if is_failed:
         exc_info = request.node.report_call.excinfo
@@ -344,20 +402,15 @@ def report_test(report_generator, request):
     report = ResultAttributes(
         link=slug,
         doc=doc,
-        nodeid=nodeid,
+        nodeid=node_id,
         pngs=BrowserRecorder.pngs,
         failure=failure,
         time1=time1,
         time2=time2,
+        header=header,
     )
+    session_results.results.append(report)
 
-    filename = os.path.join(report_generator, f"result.{slug}.html")
-    headerfile = os.path.join(report_generator, f"head.{slug}.html")
-
-    with open(headerfile, "w") as fd:
-        fd.write(header.json())
-    with open(filename, "w") as fd:
-        fd.write(report.json())
     BrowserRecorder.pngs.clear()
 
 
@@ -374,25 +427,13 @@ def pytest_runtest_makereport(item, call):
         item.report_call = ReportResult(report=report, excinfo=call.excinfo, doc=doc)
 
 
-def lettergen():
-    """
-    Used to generate unique alpha tags.
-    :return: A, B, C, ..., AA, AB, AC, ..., BA, BB, BC, ...
-    """
-    for repeat in range(1, 10):
-        for item in itertools.product(ascii_uppercase, repeat=repeat):
-            yield "".join(item)
-
-
 @pytest.fixture(scope="session")
 def report_title(request) -> str:
-    return request.config.getoption(
-        "report_title", default="Webdriver Recorder Summary"
-    )
+    return request.config.getoption("report_title", default="Webdriver Recorder Summary")
 
 
 @pytest.fixture(scope="session", autouse=True)
-def generate_report(template_filename, report_title, report_dir):
+def generate_report(template_filename, report_title, report_dir, session_results):
     """
     Uses the included HTML template to generate the final report, using the results found in `report_dir`. Can be
     called explicitly in order to do this at any time.
@@ -403,18 +444,58 @@ def generate_report(template_filename, report_title, report_dir):
         with open(template_filename) as fd:
             template = jinja2.Template(fd.read())
 
-        template.globals.update(
-            {"date": str(datetime.datetime.now()), "lettergen": lettergen, "zip": zip}
-        )
-
-        headers = iterfiles(output_dir, "head.")
-        results = iterfiles(output_dir, "result.")
-        stream = template.stream(headers=headers, results=results, project=report_title)
+        template.globals.update({"date": str(datetime.datetime.now())})
+        stream = template.stream(results=session_results)
         artifact = os.path.join(output_dir, "index.html")
         stream.dump(artifact)
-        logging.info(f"Created report: {artifact}")
+        logger.info(f"Created report: {artifact}")
 
     return inner
+
+
+class ReportGenerator:
+    def __init__(self, results_directory: str):
+        self.worker_results_files = [
+            os.path.join(results_directory, f)
+            for f in os.listdir(results_directory) if
+            f.startswith('results.worker')
+        ]
+        self.worker_results = self.load_results_files()
+        self.modules = {}
+        self.sort_results()
+        self.annotations = []
+
+    def load_results_files(self) -> List[ResultAttributes]:
+        aggregate = []
+        for f in self.worker_results_files:
+            with open(f) as results:
+                aggregate.extends([
+                    ResultAttributes.parse_obj(o)
+                    for o in json.loads(results.read())
+                ])
+        return aggregate
+
+    def sort_results(self):
+        for result in self.worker_results:
+            # test_zorp.py::test_foo[blah] becomes
+            # ["test_zorp.py", "test_foo[blah]"]
+            taxonomy = result.header.link.split('::')
+            if re.match(r'^\[.*]$', taxonomy[-1]):  # test_foo[blah]
+                case = taxonomy.pop(-1)
+                test_func, params = case.split('[')  # test_foo, blah]
+                params = params[:-1]  # Remove the trailing `]`
+            context = self.modules
+            for layer in taxonomy:  # ["test_zorp.py", "test_foo", "blah"]
+                if taxonomy[-1] == layer:  # On innermost context
+                    context[layer] = result
+                elif layer in context:
+                    context = context[layer]
+                else:
+                    context = {}
+                    context[layer] = context
+            # self.modules ==
+            #   {"test_zorp.py": {"test_foo": {"blah": ResultAttributes(...)}}}
+
 
 
 def iterfiles(dir, prefix):
