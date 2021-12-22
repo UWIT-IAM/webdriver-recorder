@@ -1,29 +1,19 @@
-import datetime
-import html
-import itertools
-import json
 import logging
 import os
-import re
-import secrets
+import sys
 import tempfile
 from contextlib import contextmanager
-from pathlib import Path
-from string import ascii_uppercase
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Callable, Dict, List, Optional, Type, Union
 
-import jinja2
 import pytest
-from pydantic import BaseModel, BaseSettings, root_validator, validator
+from pydantic import BaseSettings, validator
 from selenium import webdriver
-from webdriver_recorder.plugin import ResultHeader
 
 from .browser import BrowserError, BrowserRecorder, Chrome, Remote
-
-TEMPLATE_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), "report.template.html")
+from .models import Outcome, Report, ReportResult, TestResult, Timed
+from .report_exporter import ReportExporter
 
 _here = os.path.abspath(os.path.dirname(__file__))
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,10 +32,11 @@ class EnvSettings(BaseSettings):
     # but sometimes cannot be avoided.
     disable_session_browser: Optional[bool] = False
 
-    @validator("*", pre=True)
+    @validator("*", pre=True, always=True)
     def handle_empty_string(cls, v):
         if not v:
             return None
+        return v
 
 
 _SETTINGS = EnvSettings()
@@ -77,62 +68,32 @@ def pytest_addoption(parser):
         "--report-title",
         action="store",
         dest="report_title",
-        default=None,
-        help="An optional title for your report; if not provided, "
-        "the url of the final test-case executed before generation will be used. "
-        "You may provide a constant default by overriding the report_title fixture.",
+        default="Webdriver Recorder Summary",
+        help="An optional title for your report; if not provided, a default will be used. "
+        "You may also provide a constant default by overriding the report_title fixture.",
     )
 
 
-class HTMLEscapeBaseModel(BaseModel):
-    """
-    Base model that automatically escapes all strings passed into it.
-    """
-
-    @root_validator(pre=True)
-    def escape_strings(cls, values) -> Dict[str, Any]:
-        values = dict(values)
-        for k, v in values.items():
-            if isinstance(v, str):
-                values[k] = html.escape(str(v))
-        return values
+@pytest.fixture(scope="session", autouse=True)
+def clean_screenshots(report_dir):
+    screenshots_dir = os.path.join(report_dir, "screenshots")
+    if os.path.exists(screenshots_dir):
+        old_screenshots = os.listdir(screenshots_dir)
+        for png in old_screenshots:
+            os.remove(os.path.join(screenshots_dir, png))
 
 
-class ResultFailure(HTMLEscapeBaseModel):
-    message: str
-    url: Optional[str]
-    loglines: Optional[List[str]]
+@pytest.fixture(scope="session", autouse=True)
+def test_report(report_title) -> Report:
+    args = []
+    if len(sys.argv) > 1:
+        args.extend(sys.argv[1:])
 
-
-class ResultAttributes(HTMLEscapeBaseModel):
-    header: ResultHeader
-    link: str
-    doc: Optional[str]
-    nodeid: str
-    pngs: List[bytes]
-    failure: Optional[ResultFailure]
-    time1: str
-    time2: str
-
-
-class ResultHeader(HTMLEscapeBaseModel):
-    link: str
-    is_failed: bool
-    description: str
-
-
-class ReportResult(object):
-    """
-    A test result for passing to the report_test fixture.
-    report -- a pytest test outcome
-    excinfo -- exception info if there is any
-    doc -- the docstring for the test if there is any
-    """
-
-    def __init__(self, report, excinfo, doc):
-        self.report = report
-        self.excinfo = excinfo
-        self.doc = doc
+    return Report(
+        arguments=" ".join(args),
+        outcome=Outcome.never_started,
+        title=report_title,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -142,11 +103,6 @@ def selenium_server(request) -> Optional[str]:
     if value:
         return value.strip()
     return None
-
-
-@pytest.fixture(scope="session")
-def template_filename():
-    return TEMPLATE_FILE
 
 
 @pytest.fixture(scope="session")
@@ -259,7 +215,11 @@ def browser_context() -> Callable[..., Chrome]:
 
 
 if _SETTINGS.disable_session_browser:
-    logger.info("Disabling auto-use of 'session_browser', this may significantly decrease test performance.")
+    logger.warning("Disabling auto-use of 'session_browser', this may significantly decrease test performance.")
+
+    @pytest.fixture(scope="session")
+    def session_browser_disabled() -> bool:
+        return True
 
     @pytest.fixture
     def browser(build_browser) -> BrowserRecorder:
@@ -312,6 +272,10 @@ else:
             request.cls.browser = browser
             yield browser
 
+    @pytest.fixture(scope="session")
+    def session_browser_disabled() -> bool:
+        return False
+
 
 @pytest.fixture(scope="session")
 def report_dir(request):
@@ -320,60 +284,66 @@ def report_dir(request):
     return dir_
 
 
-@pytest.fixture(scope='session')
-def worker_file(report_dir):
-    worker_file = tempfile.mktemp(prefix="worker.", dir=report_dir)
-    Path(worker_file).touch()
-    try:
-        yield worker_file
-    finally:
-        try:
-            os.remove(worker_file)
-        except Exception as e:
-            logger.exception(e)
-
-
 @pytest.fixture(scope="session", autouse=True)
-def report_generator(generate_report, report_dir, session_results) -> str:
-    """Fixture returning the directory containing our report files. Overridable using `--report-dir`"""
-    worker_file = tempfile.mktemp(prefix="worker.", dir=report_dir)
-    try:
+def report_generator(report_dir, test_report):
+    with tempfile.NamedTemporaryFile(prefix="worker.", dir=report_dir) as worker_file:
+        suffix = ".".join(worker_file.name.split(".")[1:])
         yield
-    finally:
-        if session_results:
-            with open(os.path.join(f'results.{worker_file}.json', 'wb')) as f:
-                f.write(session_results.json())
-        os.remove(worker_file)
-        workers = list(f for f in os.listdir(report_dir) if f.startswith("worker."))
-        if not workers:
-            generate_report()
-
-
-class SessionResults(BaseModel):
-    results: List[ResultAttributes] = []
-
-
-@pytest.fixture(scope='session', autouse=True)
-def session_results() -> SessionResults:
-    return SessionResults()
+    test_report.stop_timer()
+    exporter = ReportExporter()
+    workers = list(f for f in os.listdir(report_dir) if f.startswith("worker."))
+    worker_results = list(f for f in os.listdir(report_dir) if f.endswith(".result.json"))
+    if not workers:
+        test_report.outcome = Outcome.success
+        # Aggregate worker reports into this "root" report.
+        for result_file in [os.path.join(report_dir, f) for f in worker_results]:
+            worker_report = Report.parse_file(result_file)
+            test_report.results.extend(worker_report.results)
+            os.remove(result_file)
+        exporter.export_all(test_report, report_dir)
+    else:
+        # If there are other workers, only export the report json of the
+        # current worker. The last worker running will be responsible for aggregating and reporting results.
+        exporter.export_json(test_report, report_dir, dest_filename=f"{suffix}.result.json")
 
 
 @pytest.fixture(autouse=True)
-def report_test(report_generator, request, session_results):
+def report_test(report_generator, request, test_report):
     """
     Print the results to report_file after a test run. Without this, the results of the test will not be saved.
     """
-    time1 = str(datetime.datetime.now())
-    try:
+    tb = None
+    console_logs = []
+    timer: Timed
+    with Timed() as timer:
         yield
-    finally:
-        time2 = str(datetime.datetime.now())
-    if hasattr(request.node, 'report_call'):
-        node_id = request.node.report_call.report.nodeid
+
+    call_summary = getattr(request.node, "report_result", None)
+
+    if call_summary:
+        doc = call_summary.doc
+        test_name = call_summary.report.nodeid
+        outcome = Outcome.failure if call_summary.report.failed else Outcome.success
+        if call_summary and call_summary.excinfo and not tb:
+            outcome = Outcome.failure
+            exception: BaseException = call_summary.excinfo.value
+            exception_msg = f"{exception.__class__.__name__}: {str(exception)}"
+            if isinstance(exception, BrowserError):
+                if exception.orig:
+                    tb = f"{exception_msg}\n{exception.orig=}"
+                console_logs = [log.get("message", "") for log in exception.logs]
+            if not tb:
+                tb = f"{exception_msg}\n(No traceback is available)"
+
     else:
-        logging.error(f"Unable to extract nodeid from node: {request.node}; " "not preparing report segment")
-        return
-    is_failed = request.node.report_call.report.failed
+        logging.error(
+            f"Test {request.node} reported no outcomes; "
+            f"this usually indicates a fixture caused an error when setting up the test."
+        )
+        doc = None
+        test_name = f"{request.node.name}"
+        outcome = Outcome.never_started
+
     # TODO: Figure out a way to include class docs if they exist
     #       class TestFooBar:
     #           """
@@ -383,130 +353,35 @@ def report_test(report_generator, request, session_results):
     #               """and baz is bop"""
     #               do_work('bop')
     #   The report output should then read "When foo is bar and baz is bop"
-    doc = request.node.report_call.doc
-    slug = re.sub(r"\W", "-", node_id)
-    header = ResultHeader(link=slug, is_failed=is_failed, description=node_id)
-    failure = None
-    if is_failed:
-        exc_info = request.node.report_call.excinfo
-        if isinstance(exc_info.value, BrowserError):
-            e = exc_info.value
-            failure = ResultFailure(
-                message=e.message,
-                url=e.url,
-                loglines=[log.get("message", "") for log in e.logs],
-            )
-        else:
-            failure = ResultFailure(message=str(exc_info))
 
-    report = ResultAttributes(
-        link=slug,
-        doc=doc,
-        nodeid=node_id,
+    result = TestResult(
         pngs=BrowserRecorder.pngs,
-        failure=failure,
-        time1=time1,
-        time2=time2,
-        header=header,
+        test_name=test_name,
+        test_description=doc,
+        outcome=outcome,
+        start_time=timer.start_time,
+        end_time=timer.end_time,
+        traceback=tb,
+        console_errors=console_logs,
     )
-    session_results.results.append(report)
+    BrowserRecorder.pngs = []
 
-    BrowserRecorder.pngs.clear()
+    test_report.results.append(result)
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """
     This gives us hooks from which to report status post test-run.
-    Import this into your conftest.py.
     """
     outcome = yield
+
     report = outcome.get_result()
     if report.when == "call":
         doc = getattr(getattr(item, "function", None), "__doc__", None)
-        item.report_call = ReportResult(report=report, excinfo=call.excinfo, doc=doc)
+        item.report_result = ReportResult(report=report, excinfo=call.excinfo, doc=doc)
 
 
 @pytest.fixture(scope="session")
 def report_title(request) -> str:
-    return request.config.getoption("report_title", default="Webdriver Recorder Summary")
-
-
-@pytest.fixture(scope="session", autouse=True)
-def generate_report(template_filename, report_title, report_dir, session_results):
-    """
-    Uses the included HTML template to generate the final report, using the results found in `report_dir`. Can be
-    called explicitly in order to do this at any time.
-    """
-
-    def inner(output_dir: Optional[str] = None):
-        output_dir = output_dir or report_dir
-        with open(template_filename) as fd:
-            template = jinja2.Template(fd.read())
-
-        template.globals.update({"date": str(datetime.datetime.now())})
-        stream = template.stream(results=session_results)
-        artifact = os.path.join(output_dir, "index.html")
-        stream.dump(artifact)
-        logger.info(f"Created report: {artifact}")
-
-    return inner
-
-
-class ReportGenerator:
-    def __init__(self, results_directory: str):
-        self.worker_results_files = [
-            os.path.join(results_directory, f)
-            for f in os.listdir(results_directory) if
-            f.startswith('results.worker')
-        ]
-        self.worker_results = self.load_results_files()
-        self.modules = {}
-        self.sort_results()
-        self.annotations = []
-
-    def load_results_files(self) -> List[ResultAttributes]:
-        aggregate = []
-        for f in self.worker_results_files:
-            with open(f) as results:
-                aggregate.extends([
-                    ResultAttributes.parse_obj(o)
-                    for o in json.loads(results.read())
-                ])
-        return aggregate
-
-    def sort_results(self):
-        for result in self.worker_results:
-            # test_zorp.py::test_foo[blah] becomes
-            # ["test_zorp.py", "test_foo[blah]"]
-            taxonomy = result.header.link.split('::')
-            if re.match(r'^\[.*]$', taxonomy[-1]):  # test_foo[blah]
-                case = taxonomy.pop(-1)
-                test_func, params = case.split('[')  # test_foo, blah]
-                params = params[:-1]  # Remove the trailing `]`
-            context = self.modules
-            for layer in taxonomy:  # ["test_zorp.py", "test_foo", "blah"]
-                if taxonomy[-1] == layer:  # On innermost context
-                    context[layer] = result
-                elif layer in context:
-                    context = context[layer]
-                else:
-                    context = {}
-                    context[layer] = context
-            # self.modules ==
-            #   {"test_zorp.py": {"test_foo": {"blah": ResultAttributes(...)}}}
-
-
-
-def iterfiles(dir, prefix):
-    """
-    Iterate through the objects contained in files starting with prefix.
-    Delete afterwards.
-    """
-    files = (f for f in os.listdir(dir) if f.startswith(prefix))
-    for filename in sorted(files):
-        filename = os.path.join(dir, filename)
-        with open(filename) as fd:
-            data = json.load(fd)
-        yield data
-        os.remove(filename)
+    return request.config.getoption("report_title")

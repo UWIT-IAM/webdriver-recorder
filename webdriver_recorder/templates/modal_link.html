@@ -1,0 +1,34 @@
+{#
+## template variables:
+## - modal_id: A unique id for the modal. (e.g., foo-bar-modal)
+## - button_id: (Optional!) If defined, gives your button this id.
+##              See the provided style handle below.
+## - button_content: The inner content for your button.
+##                   You may provide HTML here.
+##
+## provides the following classes for styling:
+##
+## - <modal_id>-link -- Note that this will (by default) cascade to
+##              all instances of a link to that specific modal id.
+##              If you need to further refine your styling, you
+##              should also include a button_id with your render.
+##
+## Use:
+##     {% with %}
+##         {% set modal_id="foo-bar" %}
+##         {% set button_content %}
+##              <i class="bi-exclamation-round text-warning"></i>
+##              Whoa!
+##         {% endset %}
+##         {% include 'modal_link.html' %}
+##     {% endwith %}
+#}
+<button class="btn btn-link {{ modal_id }}-link"
+        {% if button_id is defined %}
+        id="{{ button_id }}"
+        {% endif %}
+        data-bs-toggle="modal"
+        data-bs-target="#{{ modal_id }}"
+        class="btn btn-link">
+    {{ button_content|safe }}
+</button>

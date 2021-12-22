@@ -1,8 +1,7 @@
 import json
-import os
 import time
 from datetime import datetime
-from typing import Any, NoReturn
+from typing import Any, NoReturn, Optional
 from unittest import mock
 
 import pytest
@@ -10,9 +9,9 @@ from selenium.webdriver.remote.command import Command
 
 from webdriver_recorder.browser import (
     BrowserError,
+    By,
     Chrome,
     Locator,
-    SearchMethod,
     XPathWithSubstringLocator,
     _xpath_contains,
     logger,
@@ -49,8 +48,8 @@ def be_boundless_and_wait(browser: Chrome, capture_delay: int = 0) -> NoReturn:
     "locator",
     [
         XPathWithSubstringLocator(tag="p", displayed_substring="be boundless"),
-        Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="div#outputDiv"),
-        Locator(search_method=SearchMethod.ID, search_value="outputDiv"),
+        Locator(search_method=By.CSS_SELECTOR, search_value="div#outputDiv"),
+        Locator(search_method=By.ID, search_value="outputDiv"),
     ],
 )
 def test_wait_for(locator, browser, load_page):
@@ -59,24 +58,10 @@ def test_wait_for(locator, browser, load_page):
 
 
 def test_wait_for_tag(browser, load_page):
+    """Ensure that when wait_for is called using a tag with text, the element is found."""
     browser.send_inputs("be boundless")
     browser.click_button("update")
     assert browser.wait_for_tag("p", "be boundless")
-
-
-def test_context_stops_client_on_exit(url, chrome_options, load_page):
-    class TestChrome(Chrome):
-        def __init__(self):
-            self.is_stopped = False
-            super().__init__(options=chrome_options)
-
-        def stop_client(self):
-            self.is_stopped = True
-
-    with TestChrome() as b:
-        b.get(url)
-
-    assert b.is_stopped
 
 
 def test_fill_and_clear(browser, load_page):
@@ -108,6 +93,16 @@ def test_open_close_tab(browser, session_browser_disabled, load_page):
     assert len(browser.window_handles) == 3 - offset
     browser.close_tab()
     assert len(browser.window_handles) == 2 - offset
+
+
+@pytest.mark.parametrize("default_wait, input_wait, expected", [(1, 1, 1), (1, 2, 2), (1, None, 1), (1, 0, 0)])
+def test_resolve_timeout(browser, default_wait, input_wait, expected):
+    orig = browser.default_wait
+    browser.default_wait = default_wait
+    try:
+        assert browser._resolve_timeout(input_wait) == expected
+    finally:
+        browser.default_wait = orig
 
 
 def test_tab_context(browser, session_browser_disabled, load_page):
@@ -173,6 +168,22 @@ def test_send_secret(browser, load_page):
         browser.send_secret("secret-foo", "secret-bar")
         assert browser.find_element(value="inputField").get_attribute("value") == "foo"
         assert browser.find_element(value="inputField2").get_attribute("value") == "bar"
+
+
+def test_failure(browser, load_page):
+    with pytest.raises(BrowserError):
+        browser.wait_for_tag("a", "does not exist", timeout=0)
+
+
+@pytest.mark.parametrize(
+    "locator,expected",
+    [
+        (Locator(search_method=By.CSS_SELECTOR, search_value="#hi"), 'css selector whose value is "#hi"'),
+        (XPathWithSubstringLocator(tag="p", displayed_substring="hi"), 'p containing the string "hi"'),
+    ],
+)
+def test_locator_description(locator, expected):
+    assert locator.description == expected
 
 
 class LogRecorder:
@@ -250,29 +261,49 @@ def test_log_last_http_with_har(browser, log_recorder, monkeypatch):
     assert log_recorder.messages[0] == "Last HTTP transaction: 'entry #2'"
 
 
-def test_wrap_exception_no_autocapture(browser):
+def test_wrap_exception_no_autocapture(browser, load_page):
     assert not browser.pngs
     with pytest.raises(BrowserError):
-        # We should _always_ capture a snap of the page when something goes wrong
-        with browser.autocapture_off():
-            with browser.wrap_exception("expected exception"):
-                raise AttributeError("oh noes!")
+        # We should _always_ capture a snap of the page when something goes wrong,
+        # but if there is an issue with the capture, don't worry about it.
+        with browser.wrap_exception("expected exception"):
+            raise AttributeError("oh noes!")
     assert len(browser.pngs) == 1
 
 
 def test_locator_defaults():
-    locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="foo")
+    locator = Locator(search_method=By.CSS_SELECTOR, search_value="foo")
     assert locator.search_value == "foo"
-    assert "css" in locator.state_description
-    assert "foo" in locator.state_description
+    assert "css" in locator.description
+    assert "foo" in locator.description
 
 
-@pytest.mark.parametrize("wait", [True, False])
-def test_click(browser, wait, load_page):
+def test_click(browser, load_page):
     browser.send_inputs("be boundless")
-    output_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="#outputDiv")
-    button_locator = Locator(search_method=SearchMethod.CSS_SELECTOR, search_value="#doUpdate")
+    output_locator = Locator(search_method=By.CSS_SELECTOR, search_value="#outputDiv")
+    button_locator = Locator(search_method=By.CSS_SELECTOR, search_value="#doUpdate")
     output_element = browser.find_element(*output_locator.payload)
     assert not output_element.text
-    browser.click(button_locator, wait=wait)
+    browser.click(button_locator)
     assert output_element.text == "be boundless"
+
+
+@pytest.mark.parametrize(
+    "snap, context, expected_context",
+    [
+        (True, None, "Render file://{local_html_path}"),
+        (True, "Hello", "Hello"),
+        (
+            False,
+            None,
+            None,
+        ),
+    ],
+)
+def test_get_with_snap(browser, local_html_path, snap: bool, context: Optional[str], expected_context: Optional[str]):
+    assert not browser.pngs
+    browser.get(f"file://{local_html_path}", snap=snap, context=context)
+    if expected_context:
+        assert browser.pngs[-1].context == expected_context.format_map(dict(local_html_path=local_html_path))
+    else:
+        assert not browser.pngs

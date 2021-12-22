@@ -1,0 +1,60 @@
+{#
+## template variables:
+## - modal_id: A unique id for the modal. (e.g., foo-bar-modal)
+##
+## - modal_title: An h5 title for your modal. You may provide HTML here, just note
+##                it will render inside of the h5.
+##
+## - modal_body: The inner body of the modal. You may provide HTML here. This will
+##               render inside a div.
+##
+## provides the following classes for styling:
+##
+## - <modal_id>-label (e.g., foo-bar-modal-label)
+##     The inner content of the title.
+## - <modal_id>-body (e.g., foo-bar-modal-body)
+##     The inner content of the modal body.
+##
+## Use:
+##     {% with %}
+##         {% set modal_id="foo-bar" %}
+##         {% set modal_title="Foos that Bar" %}
+##         {% set modal_body %}
+##             <p>Lorem ipsum ipso facto blah de blah de bloop</p>
+##         {% endset %}
+##         {% include 'modal.html' %}
+##     {% endwith %}
+#}
+
+<div class="modal fade"
+     id="{{ modal_id }}"
+     tabindex="-1"
+     aria-labelledby="{{ modal_id }}-label" aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-primary" id="{{ modal_id }}-label">
+                    {{ modal_title|safe }}
+                </h5>
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close">
+
+                </button>
+            </div>
+            <div class="modal-body" id="{{ modal_id }}-body">
+                {{ modal_body|safe }}
+            </div>
+            <div class="modal-footer">
+                <button type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>

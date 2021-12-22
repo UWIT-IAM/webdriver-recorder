@@ -2,18 +2,30 @@
 # backed by webdriver-recorder. This is helpful if your
 # test suite is simple and has no additional dependencies.
 # TEST_DIR=/path/to/your/tests docker-compose up --build.
-version: '3'
+version: '3.1'
 services:
   selenium:
     image: selenium/standalone-chrome:4.1
+    environment:
+      SE_NODE_MAX_SESSIONS: 2  # Allows up to two concurrent browser instances to use
+                               # the node.
+      START_XFVB: "false"      # Prevents some expensive overhead we don't need
     ports:
-      - 4444:4444
-      - 7900:7900
+      - "4444:4444"            # This is the port where you can access the selenium
+                               # dashboard
+      - "7900:7900"
     logging:
       driver: "none"
+    volumes:
+      # We want for test files to available on the selenium
+      # container because tests may have files the test browser
+      # needs to serve.
+      - ${test_dir}:/tests
+
   test-runner:
     build:
       dockerfile: Dockerfile
+      target: webdriver-source
       context: .
     environment:
       REMOTE_SELENIUM: selenium:4444
@@ -23,12 +35,18 @@ services:
       COVERAGE_FILE: /coverage/.coverage
       disable_session_browser: ${disable_session_browser}
       pytest_args: ${pytest_args}
+      pytest_log_level: ${pytest_log_level}
     volumes:
       - ./webdriver-report:/webdriver-report
       - ./coverage:/coverage
       - ${test_dir}:/tests
     depends_on:
       - selenium
+    entrypoint: ./entrypoint.sh
     command: >
       coverage run -a --source=webdriver_recorder
-      -m pytest -o log_cli=true -o log_cli_level=error ${pytest_args} /tests
+      -m pytest
+      --tb short
+      -p 'webdriver_recorder.plugin'
+      -o log_cli=true -o log_cli_level=${pytest_log_level:-error}
+      ${pytest_args:-/tests}
