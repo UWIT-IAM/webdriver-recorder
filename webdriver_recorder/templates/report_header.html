@@ -5,7 +5,7 @@
                 {% if report.outcome.value == 'success' %}
                     <span class="badge test-badge bg-success">Success</span>
                 {% else %}
-                    <span class="badge test-badge bg-danger">{{ report.outcome }}</span>
+                    <span class="badge test-badge bg-danger">{{ report.outcome.value }}</span>
                 {% endif %}
                 {{ report.title }}
             </h1>
