@@ -1,0 +1,101 @@
+{# TODO: Documentation #}
+{# TODO: docstring from test as banner #}
+{% set console_log_modal_id=result.test_id ~ '-console-log' %}
+{% set traceback_modal_id=result.test_id ~ '-error-traceback' %}
+{% set result_anchor = '#' ~ result.test_id %}
+
+<div class="card test-result {% if result.outcome.value == 'success' %}result-success show{% endif %}">
+    <div class="card-header" id="{{ result.test_id }}-header">
+        <button class="btn btn-default txt-left display-inline-block width-100"
+                type="button"
+                aria-expanded="false"
+                aria-controls="{{ result.test_id }}-collapse"
+                data-bs-toggle="collapse"
+                data-bs-target="#{{ result.test_id }}-collapse">
+            {% if result.outcome.value == 'success' %}
+                <i class="bi-check-circle text-success"></i>
+            {% else %}
+                <i class="bi-exclamation-circle text-danger"></i>
+            {% endif %}
+            {{ result.test_name }}
+            <a href="#" title="Expand" class="text-secondary collapse-toggle-anchor">
+               <i class="collapse-toggle-icon bi-chevron-bar-expand">
+               </i>
+            </a>
+        </button>
+        <div class="d-inline-block">
+            <a  title="Copy permalink to clipboard"
+                class="text-secondary"
+                onclick="copyUrlToClipboard('{{ result_anchor }}', 'URL')"
+                href="{{ result_anchor }}"
+            ><i class="bi-bookmark"></i></a>
+            <a  title="Copy test id to clipboard"
+                class="text-secondary cursor-pointer"
+                onclick="copyToClipboard('{{ result.test_name }}', 'test ID')"
+            ><i class="bi-file-earmark-code"></i></a>
+        </div>
+    </div>
+    <div id="{{ result.test_id }}-collapse" class="collapse">
+        <div class="card-body" id="{{ result.test_id }}-body">
+            {% if result.test_description %}
+                <div class="card-title" id="{{ result.test_id }}-title">
+                    {{ result.test_description }}
+                </div>
+            {% endif %}
+            <div class="test-header">
+                {% if result.traceback %}
+                    {% with %}
+                        {% set modal_id=traceback_modal_id %}
+                        {% set button_content="View python traceback" %}
+                        {% include 'modal_link.html' %}
+                    {% endwith %}
+                {% endif %}
+                {% if result.console_errors %}
+                    {% with %}
+                        {% set modal_id=console_log_modal_id %}
+                        {% set button_content="View browser console errors" %}
+                        {% include 'modal_link.html' %}
+                    {% endwith %}
+                {% endif %}
+            </div>
+            {% if result.pngs %}
+                {% include 'test_screenshots.html' %}
+            {% else %}
+                <p>No screenshots were captured for this test.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if result.console_errors %}
+    {% with %}
+        {% set modal_id=console_log_modal_id %}
+        {% set modal_title=result.test_name ~ " browser console errors" %}
+        {% set modal_body %}
+            <p>
+                These errors were in the browser console logs at the time of
+                the failure. This does not always indicate they are related
+                to the test failure.
+            </p>
+            <div class="console-log-container">
+                {% for error in result.console_errors %}
+                    <code class="log-display">{{ error }}</code>
+                {% endfor %}
+            </div>
+        {% endset %}
+        {% include 'modal.html' %}
+    {% endwith %}
+{% endif %}
+
+{% if result.traceback %}
+    {% with %}
+        {% set modal_id=traceback_modal_id %}
+        {% set modal_title=result.test_name ~ " error traceback" %}
+        {% set modal_body %}
+        <div class="error-traceback-container">
+            <code class="log-display">{{ result.traceback }}</code>
+        </div>
+        {% endset %}
+        {% include 'modal.html' %}
+    {% endwith %}
+{% endif %}

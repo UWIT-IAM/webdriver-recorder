@@ -1,0 +1,68 @@
+{% set help_content %}
+    <h5>Test Summary</h5>
+    <ul>
+        <li>Click on any test title to expand or collapse its details</li>
+        <li>Click the <i class="bi-bookmark text-primary"></i>
+            bookmark icon to copy a shareable link to your clipboard.</li>
+        <li>
+            Click the <i class="bi-file-earmark-code text-primary"></i>
+            code icon to copy the test ID to your clipboard. (Useful for
+            re-running tests.)
+        </li>
+        <li>The <i class="bi-check-circle text-success"></i> success icon
+            indicates the test succeeded.</li>
+        <li>The <i class="bi-exclamation-circle text-danger"></i>
+            failure icon indicates the test failed. This may be due to a failed
+            assertion, or an error running the test.
+        </li>
+        <li>If any tests failed, you can view them easily using the "Show
+            only failures" toggle at the top of the report.</li>
+    </ul>
+    <h5>Test Details</h5>
+    <ul>
+        <li>When test details are expanded, all screenshots are rendered as
+            thumbnails. Click on the 'Open full image' link to open the
+            image in a new tab; you can also now share image URLs.</li>
+        <li>Along with thumbnails, you will usually find "context" messages
+            that were set automatically, or by the test implementer, to help
+            narrate the storyboard.</li>
+        <li>Context messages that appear in
+            <span class="text-danger">red</span> indicate that the screenshot
+            was taken after an error was encountered, and will also include the
+            type of error received. A <code>TimeoutException</code> indicates that
+            an expected element was never rendered.
+        </li>
+        <li>If a test is marked as failed, its browser logs and error tracebacks
+            will be viewable in a separate overlay (like this one). Keep in
+            mind that browser logs may show errors that do <em>not</em> have
+            anything to do with the failure. (For instance, failed asynchronous
+            requests that were expected to fail.)</li>
+    </ul>
+    <h5>Report data:</h5>
+    <ul>
+        <li>Use the "View as JSON" link to view the raw report data. This can
+            allow you to analyze or create supplementary reports of tests and
+            test histories, provided you have the links to other report JSON
+            documents.</li>
+        <li>It is also possible to generate a different report using the same
+            data. See
+            <a href="https://www.github.com/uwit-iam/webdriver-recorder/blob/main/docs/templating.md"
+               target="_blank">
+                the documentation.
+            </a>
+        </li>
+    </ul>
+{% endset %}
+
+<!-- Modal -->
+{% with %}
+    {% set modal_id="help-modal" %}
+    {% set modal_title %}
+        <i class="bi-question-circle text-primary"></i>
+        Help — WebdriverRecorder Report 5.0
+    {% endset %}
+    {% set modal_body %}
+        {{ help_content|safe }}
+    {% endset %}
+    {% include 'modal.html' %}
+{% endwith %}
