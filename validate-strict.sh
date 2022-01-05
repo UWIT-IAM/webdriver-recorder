@@ -7,5 +7,5 @@
 # This command cuts and re-splices the default tox
 # env to replace the "black" env with the "black_check" env.
 tox_envs=$(poetry run tox -l | sed '/^\\$/d' | sed 's|black|black_check|g' | paste -sd "," -)
-set -x
+set -ex
 poetry run tox -e ${tox_envs}
