@@ -1,0 +1,19 @@
+<div class="row row-cols-1 row-cols-md-4 g-4">
+    {% for png in result.pngs %}
+        <div class="col">
+            <div class="card text-center screenshot">
+                <img class="card-img-top img-thumbnail mx-auto"
+                     src="{{ png.url }}"
+                     alt='Screenshot #{{ loop.index }} for test "{{ result.test_name }}"'
+                >
+                <div class="card-title snap-caption {% if png.is_error %}text-danger{%
+                        endif %}">
+                    {{ png.caption or " " }}
+                </div>
+                <div class="card-footer image-link">
+                    <a href="{{ png.url }}" target="_blank">Open full image</a>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>

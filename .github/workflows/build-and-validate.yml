@@ -11,15 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.7
-      - uses: abatilo/actions-poetry@v2.0.0
-      - uses: nanasess/setup-chromedriver@v1.0.5
-      - run: poetry install
-      - run: poetry run tox
+      - uses: abatilo/actions-poetry@v2.1.4
+      - uses: nanasess/setup-chromedriver@v1
+      - run: poetry install --no-interaction
+      - run: ./validate-strict.sh
+        id: tox
       - if: always()
+        id: check-artifacts
+        run: |
+          ls -alh
+          if [[ -f "./webdriver-report/report.json" ]]
+          then
+              echo "::set-output name=upload-webdriver-report::true"
+          fi
+          if [[ -f "./htmlcov/index.html" ]]
+          then
+              echo "::set-output name=upload-coverage-report::true"
+          fi
+      - if: always() && steps.check-artifacts.outputs.upload-webdriver-report
         uses: actions/upload-artifact@v2
         with:
-          name: Test reports for ${{ github.sha }}
-          path: ./webdriver-report/index.html
+          name: web test storyboards for for ${{ github.sha }}
+          path: ./webdriver-report
+      - if: always() && steps.check-artifacts.outputs.upload-coverage-report
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage report for ${{ github.sha }}
+          path: ./htmlcov

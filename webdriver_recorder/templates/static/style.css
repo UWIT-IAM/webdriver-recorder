@@ -1,0 +1,201 @@
+body {
+  padding: 1em;
+  font-size: 12pt;
+}
+
+#content {
+  width: 75%;
+}
+
+#report-summary {
+  padding: 1em;
+  margin-top: 2em;
+  font-size: 90%;
+  margin-bottom: 1em;
+}
+
+#toggle-failures {
+  margin: 1em;
+}
+
+.bi-link.text-primary {
+  font-size: 14pt;
+}
+
+.toast {
+  /* By default, this is set to 350px, too short for URLs. */
+  width: max-content;
+  max-width: 100%;
+}
+
+.toast .text-success code {
+  /* On some browsers (or perhaps all?) the bootstrap
+   * default * shows up with pink text, which can lead
+   * one to believe there has been an error when
+   * it flashes quickly across your screen.
+   */
+  color: #4b2e83; /* UW Purple */
+}
+
+.result-success {
+  display: none;
+  transition: opacity 0.3s linear;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.snap-caption {
+  font-size: 75%;
+  padding-top: 1em;
+  border-top: #4b2e83; /* UW Purple */
+}
+
+.show {
+  display: block;
+}
+
+.card {
+  margin-bottom: 1em;
+}
+
+.card.screenshot {
+  max-width: 15rem;
+  max-height: 25rem;
+}
+
+.test-result .card-header {
+  padding: 0;
+}
+
+#help-modal-body ul li {
+  margin-bottom: 2em;
+}
+
+.card.screenshot img.img-thumbnail {
+  border-top: none;
+  border-right: none;
+  border-left: none;
+  border-bottom: none;
+  max-width: 13rem;
+  max-height: 18rem;
+  object-fit: contain;
+  object-position: top;
+  padding: .25rem;
+}
+
+.card-footer.image-link {
+  margin-top: auto;
+}
+
+code.log-display {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.image-link a {
+  color: #4b2e83;  /* UW Purple */
+}
+
+.image-link a:visited {
+  color: #4b2e83; /* UW Purple */
+}
+
+.image-link a:hover {
+  color: #85754d; /*UW Gold */
+}
+
+input.argument-display {
+  font-family:monospace;
+  font-size:85%;
+  color: #fff;
+}
+input.argument-display::placeholder {
+  color: #ddd;
+}
+
+/**
+  The components below create a slider toggle.
+  The styles were taken from W3C and can be
+  consulted at:
+    https://www.w3schools.com/howto/howto_css_switch.asp
+*/
+
+/* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 3.5em;
+  height: 2em;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.modal-header {
+  overflow-wrap: anywhere;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 1.5em;
+  width: 1.5em;
+  left: .25em;
+  bottom: .25em;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #4b2e83;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(1.5em);
+  -ms-transform: translateX(1.5em);
+  transform: translateX(1.5em);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 2em;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.slider-label {
+  cursor: pointer;
+  display: inline-block;
+  position: relative;
+  top: .25em;
+}
+
+.console-log-container code {
+  display:block;
+  background-color: #ccc;
+  border-radius: .5em;
+  padding: .5em;
+  margin: 1em;
+}

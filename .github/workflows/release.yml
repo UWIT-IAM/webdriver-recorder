@@ -103,7 +103,7 @@ jobs:
             from a ${{ github.event_name }} at
             <${{ env.commit_url }} | commit ${{ steps.configure.outputs.short-sha }}>
 
-      - run: poetry run tox
+      - run: ./validate-strict.sh
         id: run-tests
 
       - if: always()

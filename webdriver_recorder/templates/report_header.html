@@ -1,0 +1,68 @@
+<div id="report-summary" class="sticky-top bg-light border border-dark">
+    <div class="row align-items-center">
+        <div class="col-10">
+            <h1 class="h4">
+                {% if report.outcome.value == 'success' %}
+                    <span class="badge test-badge bg-success">Success</span>
+                {% else %}
+                    <span class="badge test-badge bg-danger">{{ report.outcome.value }}</span>
+                {% endif %}
+                {{ report.title }}
+            </h1>
+        </div>
+        <div class="col-2">
+            {% with %}
+                {% set modal_id="help-modal" %}
+                {% set button_content %}
+                    <i class="bi-question-circle text-primary"></i>
+                    Help
+                {% endset %}
+                {% include 'modal_link.html' %}
+            {% endwith %}
+        </div>
+    </div>
+    <div class="row align-items-center">
+        <div class="col-3">
+            {% if report.outcome.value != 'success' %}
+                <div id="toggle-failures">
+                    <fieldset>
+                        <label class="switch">
+                            <input type="checkbox" id="show-failures-slider">
+                            <span class="slider round"></span>
+                        </label>
+                        <label class="slider-label" for="show-failures-slider">
+                            Show only failures
+                        </label>
+                    </fieldset>
+                </div>
+            {% endif %}
+        </div>
+        <div class="col">
+            Started {{ report.start_time.strftime('%Y-%m-%d %H:%M:%S') }}, ran for
+            {{ report.duration }}.
+        </div>
+        <div class="col">
+            <a href="report.json" target="_blank">View as JSON</a>
+        </div>
+        <div class="col">
+            <a class="cursor-pointer" id="collapse-all">Collapse all</a> |
+            <a class="cursor-pointer" id="expand-all">Expand all</a>
+        </div>
+    </div>
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="input-group">
+                <div class="input-group-prepend">
+                    <div class="input-group-text bg-dark text-light">
+                        pytest args
+                    </div>
+                </div>
+                <input type="text"
+                       class="form-control bg-dark argument-display"
+                       id="pytest-arguments"
+                       value="{{ report.arguments }}"
+                       disabled>
+            </div>
+        </div>
+    </div>
+</div>
