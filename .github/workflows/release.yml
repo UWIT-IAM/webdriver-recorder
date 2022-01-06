@@ -43,15 +43,10 @@ jobs:
           project_id: ${{ secrets.IAM_GCR_REPO }}
           service_account_key: ${{ secrets.GCR_TOKEN }}
           export_default_credentials: true
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0.3.0
 
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.7
-
-      - uses: abatilo/actions-poetry@v2.1.2
-
-      - uses: nanasess/setup-chromedriver@v1.0.5
+      - uses: abatilo/actions-poetry@v2.1.4
+      - uses: nanasess/setup-chromedriver@v1
 
       - run: |
           poetry version ${{ github.event.inputs.patch-level || 'prerelease' }}
@@ -59,20 +54,18 @@ jobs:
           VERSION=$(poetry version -s)
           echo "::set-output name=release-version::$VERSION"
           echo "::set-output name=short-sha::${GITHUB_SHA:0:10}"
-          poetry install
+          poetry install --no-interaction
           poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
-          echo "SLACK_CANVAS_ID=${{ github.event_name }}/$VERSION" >> $GITHUB_ENV
         id: configure
 
-      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+      - uses: UWIT-IAM/actions/set-up-slack-notification-canvas@0.1.8
+        id: slack
+        env:
+          version: ${{ steps.configure.outputs.release-version }}
         with:
-          command: create-canvas
-          channel: '#iam-bots'  # Currently this duplicated field is required
-          description: "${{ github.workflow }}"
           json: >
             {
-              "canvasId": "${{ env.SLACK_CANVAS_ID }}",
-              "description": "${{ github.workflow }}",
+              "description": "${{ github.workflow }}: ${{ env.version }}",
               "status": "in progress",
               "channel": "#iam-bots",
               "steps": [
@@ -92,7 +85,8 @@ jobs:
                 }
               ]
             }
-      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+
+      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
         env:
           commit_url: >
             https://github.com/${{ github.repository }}/commit/${{ github.sha }}
@@ -106,8 +100,8 @@ jobs:
       - run: ./validate-strict.sh
         id: run-tests
 
-      - if: always()
-        uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+      - if: always() && steps.slack.outputs.canvas-id
+        uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
         env:
           test-status: ${{ steps.run-tests.outcome == 'success' && 'succeeded' || 'failed' }}
           release-status: ${{ steps.run-tests.outcome == 'success' && 'in progress' || 'not started' }}
@@ -141,7 +135,7 @@ jobs:
           commit: ${{ steps.version-commit.outputs.sha }}
           tag: ${{ steps.configure.outputs.release-version }}
 
-      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
         env:
           release_version: ${{ steps.configure.outputs.release-version }}
           release_url: ${{ steps.create-release.outputs.html_url || 'https://www.example.com' }}
@@ -156,7 +150,7 @@ jobs:
         if: env.dry_run != 'true'
         id: publish-release
 
-      - if: always()
+      - if: always() && steps.slack.outputs.canvas-id
         env:
           status: ${{ job.status != 'failure' && 'succeeded' || 'failed' }}
         with:
@@ -164,16 +158,9 @@ jobs:
           step-id: release
           step-status: ${{ env.status }}
           workflow-status: ${{ env.status }}
-        uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+        uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
 
-      - if: always()
-        uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
+      - if: always() && steps.slack.outputs.canvas-id
+        uses: UWIT-IAM/actions/finalize-slack-notification-canvas@0.1.8
         with:
-          command: remove-step
-          step-id: '*'
-          step-status: succeeded
-
-      - if: always()
-        uses: UWIT-IAM/actions/update-slack-workflow-canvas@main
-        with:
-          command: finalize-workflow
+          workflow-status: ${{ job.status == 'success' && 'succeeded' || 'failed' }}
