@@ -60,6 +60,21 @@ body {
   margin-bottom: 1em;
 }
 
+a.linked-card {
+  text-decoration: none;
+  color: #4b2e83; /* UW Purple */
+}
+
+a.linked-card:hover {
+  text-decoration: none;
+}
+
+a.linked-card:visited {
+  color: #4b2e83;
+  text-decoration: none;
+}
+
+
 .card.screenshot {
   max-width: 15rem;
   max-height: 25rem;

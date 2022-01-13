@@ -3,7 +3,7 @@ name = "uw-webdriver-recorder"
 # This version string is typically managed by the CI workflow,
 # and is changed anytime `poetry version [new version]` is run.
 # Do not revert this manually.
-version = "5.0.0"
+version = "5.0.1"
 description = "A pytest plugin for recording screenshots of selenium interactions, with other convenient features too."
 authors = ["Tom Thorogood <goodtom@uw.edu>"]
 license = "Apache Software License 3.0"

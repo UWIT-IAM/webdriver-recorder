@@ -1,19 +1,20 @@
-<div class="row row-cols-1 row-cols-md-4 g-4">
+<div class="d-flex flex-wrap justify-items-evenly">
     {% for png in result.pngs %}
-        <div class="col">
-            <div class="card text-center screenshot">
-                <img class="card-img-top img-thumbnail mx-auto"
-                     src="{{ png.url }}"
-                     alt='Screenshot #{{ loop.index }} for test "{{ result.test_name }}"'
-                >
-                <div class="card-title snap-caption {% if png.is_error %}text-danger{%
-                        endif %}">
-                    {{ png.caption or " " }}
+        <div class="p-2 flex-fill">
+            <a href="{{ png.url }}" target="_blank" class="linked-card">
+                <div class="card text-center screenshot">
+                    <img class="card-img-top img-thumbnail mx-auto"
+                         loading="lazy"
+                         src="{{ png.url }}"
+                         alt='[loading] Screenshot #{{ loop.index }} for test "{{ result .test_name }}"' >
+                    {% if png.caption %}
+                        <div
+                            class="card-footer snap-caption {% if png.is_error %}text-danger{% endif %}">
+                            {{ png.caption }}
+                        </div>
+                    {% endif %}
                 </div>
-                <div class="card-footer image-link">
-                    <a href="{{ png.url }}" target="_blank">Open full image</a>
-                </div>
-            </div>
+            </a>
         </div>
     {% endfor %}
 </div>
