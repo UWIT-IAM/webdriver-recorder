@@ -122,6 +122,40 @@ def test_snap(browser, load_page):
     assert len(browser.pngs) == 1
 
 
+def test_snap_0_height(browser, load_page):
+    """
+    This particular case is hard to set up, but in rare
+    circumstances a page's DOM will ahve a 0-height
+    'body', which causes an error when creating our
+    normal screenshot. Here we are simply testing that, in that case,
+    the "legacy" method of creating a screenshot is used instead.
+    """
+    # Create a fake `body` object
+    orig_find_element = browser.find_element
+    orig_screenshot = browser.get_screenshot_as_base64
+    mock_body = mock.MagicMock()
+    mock_body.rect = {"height": 0}
+
+    def mock_find_element(by_: By, value: str):
+        if value == "body":
+            return mock_body
+        return orig_find_element(by_, value)
+
+    def mock_take_screenshot():
+        return orig_screenshot()
+
+    screenshot_mocker = mock.patch.object(browser, "get_screenshot_as_base64", side_effect=mock_take_screenshot)
+    find_element_mocker = mock.patch.object(browser, "find_element", mock_find_element)
+    screenshot_mock = screenshot_mocker.start()
+    find_element_mocker.start()
+    try:
+        browser.snap()
+        screenshot_mock.assert_called_once()
+    finally:
+        screenshot_mocker.stop()
+        find_element_mocker.stop()
+
+
 def test_send(browser, load_page):
     time.sleep(0.5)
     browser.send("foo", "bar")

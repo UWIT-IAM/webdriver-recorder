@@ -237,7 +237,18 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
         Resize the window ahead of time so the full page shows in the shot.
         """
         with self._resize_for_screenshot():
-            b64_image = self.find_element(By_.TAG_NAME, "body").screenshot_as_base64
+            # The 'body' tag is the preferred way of capturing a screenshot
+            # because it will be more consistent than having to worry about
+            # scrollbars, etc. However, in some cases, a body DOM
+            # may have content but no calculated height, which causes an
+            # error when trying to capture the screenshot.
+            # This if/else prevents the error by capturing a screenshot
+            # using the window if the body's height is false-y.
+            body = self.find_element(By_.TAG_NAME, "body")
+            if body.rect.get("height"):
+                b64_image = body.screenshot_as_base64
+            else:
+                b64_image = self.get_screenshot_as_base64()
         # The sha256 digest is used to fingerprint the image.
         # This can SIGNIFICANTLY reduce the payload of a report
         # artifact bundle by de-duplicating images, especially
