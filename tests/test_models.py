@@ -15,7 +15,7 @@ def test_save_image_blank(browser, load_page):
 
 def test_timed_duration():
     timed = Timed()
-    time.sleep(1)
+    time.sleep(1.2)
     assert timed.duration == "1s"
 
 

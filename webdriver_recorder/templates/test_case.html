@@ -37,26 +37,47 @@
     </div>
     <div id="{{ result.test_id }}-collapse" class="collapse">
         <div class="card-body" id="{{ result.test_id }}-body">
-            {% if result.test_description %}
-                <div class="card-title" id="{{ result.test_id }}-title">
-                    {{ result.test_description }}
-                </div>
-            {% endif %}
             <div class="test-header">
-                {% if result.traceback %}
-                    {% with %}
-                        {% set modal_id=traceback_modal_id %}
-                        {% set button_content="View python traceback" %}
-                        {% include 'modal_link.html' %}
-                    {% endwith %}
-                {% endif %}
-                {% if result.console_errors %}
-                    {% with %}
-                        {% set modal_id=console_log_modal_id %}
-                        {% set button_content="View browser console errors" %}
-                        {% include 'modal_link.html' %}
-                    {% endwith %}
-                {% endif %}
+                <div class="test-case-attributes">
+                    <ul class="list-group list-group-horizontal-xl list-group-flush">
+                        {% if result.test_description %}
+                            <li class="list-group-item attr-description">
+                                <span class="fw-bold">Description: </span>
+                                {{ result.test_description }}
+                            </li>
+                        {% endif %}
+                        <li class="list-group-item attr-start-time text-nowrap">
+                            <span class="fw-bold">Start time: </span>
+                            {{ result.start_time|pretty_datetime }}
+                        </li>
+                        <li class="list-group-item attr-end-time text-nowrap">
+                            <span class="fw-bold">End time: </span>
+                            {{ result.end_time|pretty_datetime }}
+                        </li>
+                        <li class="list-group-item attr-duration text-nowrap">
+                            <span class="fw-bold">Duration </span>
+                            {{ result.duration }}
+                        </li>
+                        {% if result.traceback %}
+                            <li class="list-group-item">
+                                {% with %}
+                                    {% set modal_id=traceback_modal_id %}
+                                    {% set button_content="View python traceback" %}
+                                    {% include 'modal_link.html' %}
+                                {% endwith %}
+                            </li>
+                        {% endif %}
+                        {% if result.console_errors %}
+                            <li class="list-group-item">
+                                {% with %}
+                                    {% set modal_id=console_log_modal_id %}
+                                    {% set button_content="View browser console errors" %}
+                                    {% include 'modal_link.html' %}
+                                {% endwith %}
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
             </div>
             {% if result.pngs %}
                 {% include 'test_screenshots.html' %}

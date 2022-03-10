@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from datetime import datetime
 from typing import NoReturn
 
 import jinja2
@@ -35,7 +36,12 @@ class ReportExporter:
                 )
 
         self.env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
+        self.env.filters["pretty_datetime"] = self.pretty_datetime
         self.template = self.env.get_template(root_template)
+
+    @staticmethod
+    def pretty_datetime(dt: datetime):
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
 
     def export_json(
         self, report: Report, dest_directory: str, dest_filename: str = "report.json", exclude_image_data: bool = False
