@@ -214,3 +214,19 @@ input:checked + .slider:before {
   padding: .5em;
   margin: 1em;
 }
+
+.test-case-attributes {
+  font-size: 90%;
+}
+
+.test-case-attributes > ul, .test-case-attributes > ul > li {
+  border: none;
+}
+
+.test-case-attributes .btn-link {
+  font-size: 90%;
+}
+
+.screenshot-url {
+  font-size: 60%;
+}

@@ -13,6 +13,7 @@ class Image(BaseModel):
     base64: Optional[str]
     caption: Optional[str]
     is_error: bool = False
+    source_url: Optional[str]
 
     def save(self, root: str):
         if not self.base64:

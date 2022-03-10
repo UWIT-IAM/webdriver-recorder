@@ -7,6 +7,7 @@ from enum import Enum
 from hashlib import sha256
 from logging import getLogger
 from typing import Any, Callable, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 import selenium.webdriver.remote.webdriver
 from pydantic import BaseModel, Field
@@ -231,6 +232,12 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
                 caption = f"Render {url}"
             self.snap(caption=caption)
 
+    @property
+    def current_url_brief(self):
+        url = urlparse(self.current_url)
+        url = f"{url.netloc}{url.path}"
+        return url
+
     def snap(self, caption: Optional[str] = None, is_error: bool = False):
         """
         Store the screenshot as a base64 png in memory.
@@ -260,6 +267,7 @@ class BrowserRecorder(selenium.webdriver.remote.webdriver.WebDriver):
                 base64=b64_image,
                 caption=caption,
                 is_error=is_error,
+                source_url=self.current_url_brief,
             )
         )
 

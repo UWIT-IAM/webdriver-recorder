@@ -7,6 +7,12 @@
                          loading="lazy"
                          src="{{ png.url }}"
                          alt='[loading] Screenshot #{{ loop.index }} for test "{{ result .test_name }}"' >
+                    {% if png.source_url %}
+                        <div class="text-truncate screenshot-url">
+                            <span class="fw-bold">Location: </span>
+                            {{ png.source_url }}
+                        </div>
+                    {% endif %}
                     {% if png.caption %}
                         <div
                             class="card-footer snap-caption {% if png.is_error %}text-danger{% endif %}">
