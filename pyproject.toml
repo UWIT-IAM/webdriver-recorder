@@ -19,7 +19,7 @@ packages = [
 "uw-webdriver-recorder" = "webdriver_recorder.plugin"
 
 [tool.poetry.dependencies]
-python = ">=3.7,<3.10.7"
+python = ">=3.7,<3.10"
 pytest = ">=6.2.4"
 Jinja2 = "^3.0.1"
 selenium = "^4.1.0"
