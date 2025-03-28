@@ -29,12 +29,12 @@ jobs:
               echo "::set-output name=upload-coverage-report::true"
           fi
       - if: always() && steps.check-artifacts.outputs.upload-webdriver-report
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: web test storyboards for for ${{ github.sha }}
           path: ./webdriver-report
       - if: always() && steps.check-artifacts.outputs.upload-coverage-report
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage report for ${{ github.sha }}
           path: ./htmlcov
