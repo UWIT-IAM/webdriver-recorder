@@ -1,4 +1,4 @@
-FROM python:${PYTHON_VERSION}-slim AS env-base
+FROM python:3.9-slim AS env-base
 
 # Python base config
 ENV PYTHONUNBUFFERED=1
