@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: abatilo/actions-poetry@v2.1.4
-      - uses: nanasess/setup-chromedriver@v1
+      - uses: browser-actions/setup-chrome@v1
       - run: poetry install --no-interaction
       - run: ./validate-strict.sh
         id: tox
