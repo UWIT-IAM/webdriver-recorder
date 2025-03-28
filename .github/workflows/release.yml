@@ -1,6 +1,5 @@
 name: Release new version of webdriver-recorder
-
-on:
+'on':
   push:
     branches:
       - master
@@ -10,20 +9,20 @@ on:
       patch-level:
         default: prerelease
         required: true
-        description: "VERSION INSTRUCTION. (Can be an explicit version or a hint
-                      to poetry from patch|minor|major|prerelease)"
+        description: >-
+          VERSION INSTRUCTION. (Can be an explicit version or a hint to poetry
+          from patch|minor|major|prerelease)
       dry-run:
         required: true
         default: 'true'
-        description: >
+        description: |
           DRY RUN? (Change this to 'false' if you are sure you want to release!)
-
 env:
   workflow_url: >
-    https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id
+    }}
   dry_run: 'true'
-  MS_TEAMS_WEBHOOK_URL: ${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}
-
+  MS_TEAMS_WEBHOOK_URL: '${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}'
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -36,12 +35,11 @@ jobs:
           then
             echo 'dry_run=false' >> $GITHUB_ENV
           fi
-
       - uses: actions/checkout@v4
       - name: Auth to Cloud
-        uses: 'uwit-iam/action-auth-artifact-registry@main'
+        uses: uwit-iam/action-auth-artifact-registry@main
         with:
-          credentials: "${{ secrets.MCI_GCLOUD_AUTH_JSON }}"
+          credentials: '${{ secrets.MCI_GCLOUD_AUTH_JSON }}'
           enable_private_docker: true
       - name: Install Poetry
         shell: bash
@@ -50,10 +48,8 @@ jobs:
       - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
-
+          python-version: '3.9'
       - uses: browser-actions/setup-chrome@v1
-
       - name: Notify Teams - Workflow Started
         if: env.dry_run != 'true'
         run: |
@@ -93,7 +89,6 @@ jobs:
                  ]
                }' \
                "${{ env.MS_TEAMS_WEBHOOK_URL }}"
-
       - run: |
           poetry version ${{ github.event.inputs.patch-level || 'prerelease' }}
           set -x
@@ -103,35 +98,30 @@ jobs:
           poetry install --no-interaction
           poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
         id: configure
-
       - run: ./validate-strict.sh
         id: run-tests
-
       - uses: EndBug/add-and-commit@v7.2.1
         id: update-project-version
         env:
           commit-message: >
-            Update pyproject.toml version to
-            ${{ steps.configure.outputs.release-version }}
+            Update pyproject.toml version to ${{
+            steps.configure.outputs.release-version }}
         with:
           add: pyproject.toml poetry.lock
           pull_strategy: NO-PULL
-          push: ${{ env.dry_run == 'true' && 'false' || 'true' }}
+          push: '${{ env.dry_run == ''true'' && ''false'' || ''true'' }}'
           default_author: github_actor
-          message: ${{ env.commit-message }}
-
+          message: '${{ env.commit-message }}'
       - id: version-commit
-        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+        run: 'echo "::set-output name=sha::$(git rev-parse HEAD)"'
         shell: bash
-
       - uses: ncipollo/release-action@v1.8.6
         if: env.dry_run != 'true'
         id: create-release
         with:
-          token: ${{ github.token }}
-          commit: ${{ steps.version-commit.outputs.sha }}
-          tag: ${{ steps.configure.outputs.release-version }}
-
+          token: '${{ github.token }}'
+          commit: '${{ steps.version-commit.outputs.sha }}'
+          tag: '${{ steps.configure.outputs.release-version }}'
       - name: Notify Teams - Release Created
         if: env.dry_run != 'true'
         run: |
@@ -178,13 +168,12 @@ jobs:
                  ]
                }' \
                "${{ env.MS_TEAMS_WEBHOOK_URL }}"
-
       - name: Notify Teams - Workflow Completion
         if: always()
         run: |
           status="${{ job.status }}"
           status_emoji=$([ "$status" = "success" ] && echo "✅" || echo "❌")
-          
+
           curl -H "Content-Type: application/json" \
                -d '{
                  "type": "message",

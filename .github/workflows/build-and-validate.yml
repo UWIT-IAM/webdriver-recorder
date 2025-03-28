@@ -1,11 +1,10 @@
 name: Build and validate plugin
-on:
-  pull_request:
+'on':
+  pull_request: null
   push:
     branches:
       - test-build-and-validate-workflow
       - main
-
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -14,12 +13,12 @@ jobs:
       - name: Run uwit-iam/action-setup-poetry-project
         uses: uwit-iam/action-setup-poetry-project@main
         with:
-          credentials: "${{ secrets.MCI_GCLOUD_AUTH_JSON }}"
+          credentials: '${{ secrets.MCI_GCLOUD_AUTH_JSON }}'
           enable_private_docker: true
       - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: '3.9'
       - uses: browser-actions/setup-chrome@v1
       - run: poetry install --no-interaction
       - run: ./validate-strict.sh
@@ -39,10 +38,10 @@ jobs:
       - if: always() && steps.check-artifacts.outputs.upload-webdriver-report
         uses: actions/upload-artifact@v4
         with:
-          name: web test storyboards for for ${{ github.sha }}
+          name: 'web test storyboards for for ${{ github.sha }}'
           path: ./webdriver-report
       - if: always() && steps.check-artifacts.outputs.upload-coverage-report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage report for ${{ github.sha }}
+          name: 'coverage report for ${{ github.sha }}'
           path: ./htmlcov
