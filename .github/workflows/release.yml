@@ -22,7 +22,7 @@ env:
   workflow_url: >
     https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
   dry_run: 'true'
-  MS_TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_INTEGRATIONS_DAILY_WEB_TESTSL }}
+  MS_TEAMS_WEBHOOK_URL: ${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}
 
 jobs:
   build-and-release:
