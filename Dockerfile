@@ -1,4 +1,4 @@
-FROM us-docker.pkg.dev/uwit-mci-iam/containers/base-python-3.9:latest AS dependencies
+FROM us-docker.pkg.dev/uwit-mci-iam/containers/base-python-3.9:latest AS env-base
 
 WORKDIR /app
 COPY poetry.lock pyproject.toml ./
