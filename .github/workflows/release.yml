@@ -38,16 +38,20 @@ jobs:
           fi
 
       - uses: actions/checkout@v4
-      - name: Run uwit-iam/action-setup-poetry-project
-        uses: uwit-iam/action-setup-poetry-project@main
+      - name: Auth to Cloud
+        uses: 'uwit-iam/action-auth-artifact-registry@main'
         with:
           credentials: "${{ secrets.MCI_GCLOUD_AUTH_JSON }}"
           enable_private_docker: true
-          enable_private_pypi: true
+      - name: Install Poetry
+        shell: bash
+        run: |
+          pipx install poetry
       - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
+
       - uses: browser-actions/setup-chrome@v1
 
       - name: Notify Teams - Workflow Started
