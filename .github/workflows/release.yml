@@ -22,7 +22,7 @@ env:
   workflow_url: >
     https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
   dry_run: 'true'
-  MS_TEAMS_WEBHOOK_URL: ${{ secrets.MS_TEAMS_WEBHOOK_URL }}
+  MS_TEAMS_WEBHOOK_URL: ${{ secrets.UW_DIRECTORY_DEPLOY_MS_TEAMS_WEBHOOK_URL }}
 
 jobs:
   build-and-release:
@@ -213,6 +213,7 @@ jobs:
                          {
                            "type": "FactSet",
                            "facts": [
+                             {"title": "Dry Run:", "value": "${{ env.dry_run }}"},
                              {"title": "Version:", "value": "${{ steps.configure.outputs.release-version }}"},
                              {"title": "Status:", "value": "'"$status"'"},
                              {"title": "Initiated By:", "value": "${{ github.actor }}"}
