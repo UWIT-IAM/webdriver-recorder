@@ -16,6 +16,10 @@ jobs:
         with:
           credentials: "${{ secrets.MCI_GCLOUD_AUTH_JSON }}"
           enable_private_docker: true
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+         python-version: "3.9"
       - uses: browser-actions/setup-chrome@v1
       - run: poetry install --no-interaction
       - run: ./validate-strict.sh
