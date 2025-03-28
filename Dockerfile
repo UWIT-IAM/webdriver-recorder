@@ -1,4 +1,7 @@
-FROM us-docker.pkg.dev/uwit-mci-iam/containers/base-python-3.9:latest AS poetry-base
+FROM us-docker.pkg.dev/uwit-mci-iam/containers/base-python-3.9:latest AS env-base
+RUN apt-get update && apt-get install -y curl jq
+
+FROM env-base AS poetry-base
 WORKDIR /webdriver
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --no-interaction
