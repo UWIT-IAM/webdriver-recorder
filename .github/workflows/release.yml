@@ -26,29 +26,33 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          if [[ -n "${{ github.event.inputs.dry-run }}" ]]
-          then
+      - name: Determine Dry Run Status
+        run: |
+          if [[ -n "${{ github.event.inputs.dry-run }}" ]]; then
             echo 'dry_run=${{ github.event.inputs.dry-run }}' >> $GITHUB_ENV
-          elif [[ "$(basename ${{ github.ref }})" == "master" ]]
-          then
+          elif [[ "$(basename ${{ github.ref }})" == "master" ]]; then
             echo 'dry_run=false' >> $GITHUB_ENV
           fi
+
       - uses: actions/checkout@v4
+
       - name: Auth to Cloud
         uses: uwit-iam/action-auth-artifact-registry@main
         with:
           credentials: ${{ secrets.MCI_GCLOUD_AUTH_JSON }}
           enable_private_docker: true
+
       - name: Install Poetry
+        run: pipx install poetry
         shell: bash
-        run: |
-          pipx install poetry
+
       - name: Set up Python 3.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+
       - uses: browser-actions/setup-chrome@v1
+
       - name: Notify Teams - Workflow Started
         if: env.dry_run != 'true'
         run: |
@@ -88,38 +92,49 @@ jobs:
                  ]
                }' \
                "${{ env.MS_TEAMS_WEBHOOK_URL }}"
-      - run: |
+
+      - name: Configure Release
+        run: |
           poetry version ${{ github.event.inputs.patch-level || 'prerelease' }}
           set -x
           VERSION=$(poetry version -s)
-          echo "::set-output name=release-version::$VERSION"
-          echo "::set-output name=short-sha::${GITHUB_SHA:0:10}"
+          echo "release-version=$VERSION" >> "$GITHUB_ENV"
+          echo "short-sha=${GITHUB_SHA:0:10}" >> "$GITHUB_ENV"
           poetry install --no-interaction
           poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
         id: configure
-      - run: ./validate-strict.sh
+
+      - name: Run Validation Tests
+        run: ./validate-strict.sh
         id: run-tests
-      - uses: EndBug/add-and-commit@v7.2.1
+
+      - name: Update Project Version
+        uses: EndBug/add-and-commit@v7.2.1
         id: update-project-version
         env:
           commit-message: >
-            Update pyproject.toml version to ${{ steps.configure.outputs.release-version }}
+            Update pyproject.toml version to ${{ env.release-version }}
         with:
           add: pyproject.toml poetry.lock
           pull_strategy: NO-PULL
-          push: ${{ env.dry_run == 'true' && 'false' || 'true' }}
+          push: ${{ env.dry_run != 'true' }}
           default_author: github_actor
           message: ${{ env.commit-message }}
-      - id: version-commit
-        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Capture Version Commit SHA
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
         shell: bash
-      - uses: ncipollo/release-action@v1.8.6
+        id: version-commit
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.14.0
         if: env.dry_run != 'true'
         id: create-release
         with:
           token: ${{ github.token }}
-          commit: ${{ steps.version-commit.outputs.sha }}
-          tag: ${{ steps.configure.outputs.release-version }}
+          commit: ${{ env.sha }}
+          tag: ${{ env.release-version }}
+
       - name: Notify Teams - Release Created
         if: env.dry_run != 'true'
         run: |
@@ -148,7 +163,7 @@ jobs:
                          {
                            "type": "FactSet",
                            "facts": [
-                             {"title": "Version:", "value": "${{ steps.configure.outputs.release-version }}"},
+                             {"title": "Version:", "value": "${{ env.release-version }}"},
                              {"title": "Initiated By:", "value": "${{ github.actor }}"},
                              {"title": "Workflow URL:", "value": "${{ env.workflow_url }}"}
                            ]
@@ -166,6 +181,7 @@ jobs:
                  ]
                }' \
                "${{ env.MS_TEAMS_WEBHOOK_URL }}"
+
       - name: Notify Teams - Workflow Completion
         if: always()
         run: |
@@ -198,7 +214,7 @@ jobs:
                            "type": "FactSet",
                            "facts": [
                              {"title": "Dry Run:", "value": "${{ env.dry_run }}"},
-                             {"title": "Version:", "value": "${{ steps.configure.outputs.release-version }}"},
+                             {"title": "Version:", "value": "${{ env.release-version }}"},
                              {"title": "Status:", "value": "'"$status"'"},
                              {"title": "Initiated By:", "value": "${{ github.actor }}"}
                            ]
