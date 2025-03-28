@@ -109,7 +109,7 @@ jobs:
         with:
           add: pyproject.toml poetry.lock
           pull_strategy: NO-PULL
-          push: '${{ env.dry_run == ''true'' && ''false'' || ''true'' }}'
+          push: ${{ env.dry_run == 'true' && 'false' || 'true' }}
           default_author: github_actor
           message: '${{ env.commit-message }}'
       - id: version-commit
