@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Auth to Cloud
+        uses: 'uwit-iam/action-auth-artifact-registry@main'
+        with:
+          credentials: "${{ secrets.MCI_GCLOUD_AUTH_JSON }}"
+          enable_private_docker: true
       - name: Install Poetry
         shell: bash
         run: |
