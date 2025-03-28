@@ -1,10 +1,10 @@
-FROM python:3.9 AS env-base
-RUN apt-get update && apt-get install -y curl jq
-
-FROM env-base AS poetry-base
+FROM us-docker.pkg.dev/uwit-mci-iam/containers/base-python-3.9:latest AS poetry-base
 WORKDIR /webdriver
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root --no-interaction
+RUN --mount=type=secret,id=gcloud_auth_credentials \
+    poetry self add keyrings.google-artifactregistry-auth && \
+    export GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcloud_auth_credentials && \
+    poetry install --no-root --no-interaction
 
 FROM poetry-base as webdriver-source
 WORKDIR /webdriver
