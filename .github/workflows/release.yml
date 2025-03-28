@@ -103,8 +103,7 @@ jobs:
         id: update-project-version
         env:
           commit-message: >
-            Update pyproject.toml version to ${{
-            steps.configure.outputs.release-version }}
+            Update pyproject.toml version to ${{ steps.configure.outputs.release-version }}
         with:
           add: pyproject.toml poetry.lock
           pull_strategy: NO-PULL
