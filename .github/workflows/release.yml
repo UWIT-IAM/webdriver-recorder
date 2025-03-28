@@ -43,6 +43,7 @@ jobs:
         with:
           credentials: "${{ secrets.MCI_GCLOUD_AUTH_JSON }}"
           enable_private_docker: true
+          enable_private_pypi: true
       - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
