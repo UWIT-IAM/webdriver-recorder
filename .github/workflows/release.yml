@@ -37,6 +37,15 @@ jobs:
             echo 'dry_run=false' >> $GITHUB_ENV
           fi
 
+      - name: Check Secret Access
+        run: |
+          if [[ -z "${{ secrets.UW_DIRECTORY_DEPLOY_MS_TEAMS_WEBHOOK_URL }}" ]]; then
+            echo "❌ Webhook URL is empty! Check GitHub Secrets."
+            exit 1
+          else
+            echo "✅ Webhook URL is set."
+          fi
+
       - uses: actions/checkout@v4
 
       - name: Auth to Cloud
