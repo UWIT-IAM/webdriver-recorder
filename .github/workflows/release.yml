@@ -22,7 +22,7 @@ env:
   workflow_url: >
     https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
   dry_run: 'true'
-  MS_TEAMS_WEBHOOK_URL: ${{ secrets.UW_DIRECTORY_DEPLOY_MS_TEAMS_WEBHOOK_URL }}
+  MS_TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_INTEGRATIONS_DAILY_WEB_TESTSL }}
 
 jobs:
   build-and-release:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Check Secret Access
         run: |
-          if [[ -z "${{ secrets.UW_DIRECTORY_DEPLOY_MS_TEAMS_WEBHOOK_URL }}" ]]; then
+          if [[ -z "${{ secrets.TEAMS_INTEGRATIONS_DAILY_WEB_TESTS }}" ]]; then
             echo "❌ Webhook URL is empty! Check GitHub Secrets."
             exit 1
           else
