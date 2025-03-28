@@ -1,5 +1,5 @@
 name: Release new version of webdriver-recorder
-'on':
+on:
   push:
     branches:
       - master
@@ -21,7 +21,7 @@ env:
   workflow_url: >
     https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
   dry_run: 'true'
-  MS_TEAMS_WEBHOOK_URL: '${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}'
+  MS_TEAMS_WEBHOOK_URL: ${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}
 jobs:
   build-and-release:
     runs-on: ubuntu-latest

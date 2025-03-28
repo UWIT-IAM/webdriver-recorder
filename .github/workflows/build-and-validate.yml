@@ -1,5 +1,5 @@
 name: Build and validate plugin
-'on':
+on:
   pull_request: null
   push:
     branches:
