@@ -224,7 +224,7 @@ jobs:
                          {
                            "type": "Action.OpenUrl",
                            "title": "View Workflow",
-                           "url": "${{ env.workflow_url }}"
+                           "url": "'"${{ env.workflow_url }}"'"
                          }
                        ]
                      }
