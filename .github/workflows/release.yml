@@ -19,8 +19,7 @@ name: Release new version of webdriver-recorder
           DRY RUN? (Change this to 'false' if you are sure you want to release!)
 env:
   workflow_url: >
-    https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id
-    }}
+    https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
   dry_run: 'true'
   MS_TEAMS_WEBHOOK_URL: '${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}'
 jobs:
@@ -39,7 +38,7 @@ jobs:
       - name: Auth to Cloud
         uses: uwit-iam/action-auth-artifact-registry@main
         with:
-          credentials: '${{ secrets.MCI_GCLOUD_AUTH_JSON }}'
+          credentials: ${{ secrets.MCI_GCLOUD_AUTH_JSON }}
           enable_private_docker: true
       - name: Install Poetry
         shell: bash
@@ -111,17 +110,17 @@ jobs:
           pull_strategy: NO-PULL
           push: ${{ env.dry_run == 'true' && 'false' || 'true' }}
           default_author: github_actor
-          message: '${{ env.commit-message }}'
+          message: ${{ env.commit-message }}
       - id: version-commit
-        run: 'echo "::set-output name=sha::$(git rev-parse HEAD)"'
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
         shell: bash
       - uses: ncipollo/release-action@v1.8.6
         if: env.dry_run != 'true'
         id: create-release
         with:
-          token: '${{ github.token }}'
-          commit: '${{ steps.version-commit.outputs.sha }}'
-          tag: '${{ steps.configure.outputs.release-version }}'
+          token: ${{ github.token }}
+          commit: ${{ steps.version-commit.outputs.sha }}
+          tag: ${{ steps.configure.outputs.release-version }}
       - name: Notify Teams - Release Created
         if: env.dry_run != 'true'
         run: |
