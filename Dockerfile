@@ -4,6 +4,12 @@ FROM python:3.9-slim AS env-base
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
 # pip base config
 ENV PIP_NO_CACHE_DIR=yes
 ENV PIP_DISABLE_PIP_VERSION_CHECK=on
@@ -18,6 +24,7 @@ RUN pip install --upgrade pipx
 
 # Install poetry via pipx
 RUN pipx install poetry
+
 
 # Update PATH
 ENV PATH="/root/.local/bin:${PATH}"
