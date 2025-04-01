@@ -1,5 +1,4 @@
 name: Release new version of webdriver-recorder
-
 on:
   push:
     branches:
@@ -10,157 +9,226 @@ on:
       patch-level:
         default: prerelease
         required: true
-        description: "VERSION INSTRUCTION. (Can be an explicit version or a hint
-                      to poetry from patch|minor|major|prerelease)"
+        description: >-
+          VERSION INSTRUCTION. (Can be an explicit version or a hint to poetry
+          from patch|minor|major|prerelease)
       dry-run:
         required: true
         default: 'true'
-        description: >
+        description: |
           DRY RUN? (Change this to 'false' if you are sure you want to release!)
-
 env:
   workflow_url: >
     https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
   dry_run: 'true'
-  SLACK_BOT_TOKEN: ${{ secrets.ACTIONS_SLACK_BOT_TOKEN }}
-
+  MS_TEAMS_WEBHOOK_URL: ${{ secrets.WEB_RECORDER_TEAMS_WEB_HOOK_URL }}
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          if [[ -n "${{ github.event.inputs.dry-run }}" ]]
-          then
+      - name: Determine Dry Run Status
+        run: |
+          if [[ -n "${{ github.event.inputs.dry-run }}" ]]; then
             echo 'dry_run=${{ github.event.inputs.dry-run }}' >> $GITHUB_ENV
-          elif [[ "$(basename ${{ github.ref }})" == "master" ]]
-          then
+          elif [[ "$(basename ${{ github.ref }})" == "master" ]]; then
             echo 'dry_run=false' >> $GITHUB_ENV
           fi
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - with:
-          project_id: ${{ secrets.IAM_GCR_REPO }}
-          service_account_key: ${{ secrets.GCR_TOKEN }}
-          export_default_credentials: true
-        uses: google-github-actions/setup-gcloud@v0.3.0
+      - name: Auth to Cloud
+        uses: uwit-iam/action-auth-artifact-registry@main
+        with:
+          credentials: ${{ secrets.MCI_GCLOUD_AUTH_JSON }}
+          enable_private_docker: true
 
-      - uses: abatilo/actions-poetry@v2.1.4
-      - uses: nanasess/setup-chromedriver@v1
+      - name: Install Poetry
+        run: pipx install poetry
+        shell: bash
 
-      - run: |
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - uses: browser-actions/setup-chrome@v1
+
+      - name: Notify Teams - Workflow Started
+        if: env.dry_run != 'true'
+        run: |
+          curl -H "Content-Type: application/json" \
+               -d '{
+                 "type": "message",
+                 "attachments": [
+                   {
+                     "contentType": "application/vnd.microsoft.card.adaptive",
+                     "content": {
+                       "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                       "type": "AdaptiveCard",
+                       "version": "1.4",
+                       "body": [
+                         {
+                           "type": "TextBlock",
+                           "size": "Large",
+                           "weight": "Bolder",
+                           "text": "Webdriver Recorder - Release Workflow"
+                         },
+                         {
+                           "type": "TextBlock",
+                           "text": "Release workflow is starting.",
+                           "wrap": true
+                         },
+                         {
+                           "type": "FactSet",
+                           "facts": [
+                             {"title": "Dry Run:", "value": "${{ env.dry_run }}"},
+                             {"title": "Initiated By:", "value": "${{ github.actor }}"},
+                             {"title": "Branch:", "value": "${{ github.ref_name }}"}
+                           ]
+                         }
+                       ]
+                     }
+                   }
+                 ]
+               }' \
+               "${{ env.MS_TEAMS_WEBHOOK_URL }}"
+
+      - name: Configure Release
+        run: |
           poetry version ${{ github.event.inputs.patch-level || 'prerelease' }}
           set -x
           VERSION=$(poetry version -s)
-          echo "::set-output name=release-version::$VERSION"
-          echo "::set-output name=short-sha::${GITHUB_SHA:0:10}"
+          echo "release-version=$VERSION" >> "$GITHUB_ENV"
+          echo "short-sha=${GITHUB_SHA:0:10}" >> "$GITHUB_ENV"
           poetry install --no-interaction
           poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
         id: configure
 
-      - uses: UWIT-IAM/actions/set-up-slack-notification-canvas@0.1.8
-        id: slack
-        env:
-          version: ${{ steps.configure.outputs.release-version }}
-        with:
-          json: >
-            {
-              "description": "${{ github.workflow }}: ${{ env.version }}",
-              "status": "in progress",
-              "channel": "#iam-bots",
-              "steps": [
-                {
-                  "description": "Configure <${{ env.workflow_url }} | workflow>",
-                  "status": "succeeded",
-                  "stepId": "configure"
-                },
-                {
-                  "description": "Run tests",
-                  "status": "in progress",
-                  "stepId": "run-tests"
-                },
-                {
-                  "description": "Release version ${{ steps.configure.outputs.release-version }}",
-                  "stepId": "release"
-                }
-              ]
-            }
-
-      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
-        env:
-          commit_url: >
-            https://github.com/${{ github.repository }}/commit/${{ github.sha }}
-        with:
-          command: add-artifact
-          description: >
-            <${{ env.workflow_url }} | Workflow> triggered by ${{ github.actor }}
-            from a ${{ github.event_name }} at
-            <${{ env.commit_url }} | commit ${{ steps.configure.outputs.short-sha }}>
-
-      - run: ./validate-strict.sh
+      - name: Run Validation Tests
+        run: ./validate-strict.sh
         id: run-tests
 
-      - if: always() && steps.slack.outputs.canvas-id
-        uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
-        env:
-          test-status: ${{ steps.run-tests.outcome == 'success' && 'succeeded' || 'failed' }}
-          release-status: ${{ steps.run-tests.outcome == 'success' && 'in progress' || 'not started' }}
-        with:
-          command: update-workflow
-          step-id: run-tests, release
-          step-status: ${{ env.test-status }}, ${{ env.release-status }}
-
-      - uses: EndBug/add-and-commit@v7.2.1
+      - name: Update Project Version
+        uses: EndBug/add-and-commit@v7.2.1
         id: update-project-version
         env:
           commit-message: >
-            Update pyproject.toml version to
-            ${{ steps.configure.outputs.release-version }}
+            Update pyproject.toml version to ${{ env.release-version }}
         with:
           add: pyproject.toml poetry.lock
           pull_strategy: NO-PULL
-          push: ${{ env.dry_run == 'true' && 'false' || 'true' }}
+          push: ${{ env.dry_run != 'true' }}
           default_author: github_actor
           message: ${{ env.commit-message }}
 
-      - id: version-commit
-        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+      - name: Capture Version Commit SHA
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
         shell: bash
+        id: version-commit
 
-      - uses: ncipollo/release-action@v1.8.6
+      - name: Create Release
+        uses: ncipollo/release-action@v1.14.0
         if: env.dry_run != 'true'
         id: create-release
         with:
           token: ${{ github.token }}
-          commit: ${{ steps.version-commit.outputs.sha }}
-          tag: ${{ steps.configure.outputs.release-version }}
+          commit: ${{ env.sha }}
+          tag: ${{ env.release-version }}
 
-      - uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
-        env:
-          release_version: ${{ steps.configure.outputs.release-version }}
-          release_url: ${{ steps.create-release.outputs.html_url || 'https://www.example.com' }}
-          action_desc: ${{ env.dry_run == 'true' && 'Dry-run for' || 'Published' }}
-        with:
-          command: add-artifact
-          description: >
-            ${{ env.action_desc }} release
-            <${{ env.release_url }} | ${{ env.release_version }}>
-
-      - run: poetry publish --build
+      - name: Notify Teams - Release Created
         if: env.dry_run != 'true'
-        id: publish-release
+        run: |
+          curl -H "Content-Type: application/json" \
+               -d '{
+                 "type": "message",
+                 "attachments": [
+                   {
+                     "contentType": "application/vnd.microsoft.card.adaptive",
+                     "content": {
+                       "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                       "type": "AdaptiveCard",
+                       "version": "1.4",
+                       "body": [
+                         {
+                           "type": "TextBlock",
+                           "size": "Large",
+                           "weight": "Bolder",
+                           "text": "Webdriver Recorder - Release Published"
+                         },
+                         {
+                           "type": "TextBlock",
+                           "text": "New release has been created.",
+                           "wrap": true
+                         },
+                         {
+                           "type": "FactSet",
+                           "facts": [
+                             {"title": "Version:", "value": "${{ env.release-version }}"},
+                             {"title": "Initiated By:", "value": "${{ github.actor }}"},
+                             {"title": "Workflow URL:", "value": "${{ env.workflow_url }}"}
+                           ]
+                         }
+                       ],
+                       "actions": [
+                         {
+                           "type": "Action.OpenUrl",
+                           "title": "View Release",
+                           "url": "${{ steps.create-release.outputs.html_url }}"
+                         }
+                       ]
+                     }
+                   }
+                 ]
+               }' \
+               "${{ env.MS_TEAMS_WEBHOOK_URL }}"
 
-      - if: always() && steps.slack.outputs.canvas-id
-        env:
-          status: ${{ job.status != 'failure' && 'succeeded' || 'failed' }}
-        with:
-          command: update-workflow
-          step-id: release
-          step-status: ${{ env.status }}
-          workflow-status: ${{ env.status }}
-        uses: UWIT-IAM/actions/update-slack-workflow-canvas@0.1.8
+      - name: Notify Teams - Workflow Completion
+        if: always()
+        run: |
+          status="${{ job.status }}"
+          status_emoji=$([ "$status" = "success" ] && echo "✅" || echo "❌")
 
-      - if: always() && steps.slack.outputs.canvas-id
-        uses: UWIT-IAM/actions/finalize-slack-notification-canvas@0.1.8
-        with:
-          workflow-status: ${{ job.status == 'success' && 'succeeded' || 'failed' }}
+          curl -H "Content-Type: application/json" \
+               -d '{
+                 "type": "message",
+                 "attachments": [
+                   {
+                     "contentType": "application/vnd.microsoft.card.adaptive",
+                     "content": {
+                       "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                       "type": "AdaptiveCard",
+                       "version": "1.4",
+                       "body": [
+                         {
+                           "type": "TextBlock",
+                           "size": "Large",
+                           "weight": "Bolder",
+                           "text": "Webdriver Recorder - Workflow '"$status_emoji"'"
+                         },
+                         {
+                           "type": "TextBlock",
+                           "text": "Release workflow has '"$status"'.",
+                           "wrap": true
+                         },
+                         {
+                           "type": "FactSet",
+                           "facts": [
+                             {"title": "Dry Run:", "value": "${{ env.dry_run }}"},
+                             {"title": "Version:", "value": "${{ env.release-version }}"},
+                             {"title": "Status:", "value": "'"$status"'"},
+                             {"title": "Initiated By:", "value": "${{ github.actor }}"}
+                           ]
+                         }
+                       ],
+                       "actions": [
+                         {
+                           "type": "Action.OpenUrl",
+                           "title": "View Workflow",
+                           "url": "'"${{ env.workflow_url }}"'"
+                         }
+                       ]
+                     }
+                   }
+                 ]
+               }' \
+               "${{ env.MS_TEAMS_WEBHOOK_URL }}"

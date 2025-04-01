@@ -3,38 +3,54 @@ on:
   pull_request:
   push:
     branches:
-     - test-build-and-validate-workflow
-     - main
-
+      - test-build-and-validate-workflow
+      - main
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - uses: abatilo/actions-poetry@v2.1.4
-      - uses: nanasess/setup-chromedriver@v1
-      - run: poetry install --no-interaction
-      - run: ./validate-strict.sh
+      - uses: actions/checkout@v4
+      - name: Run uwit-iam/action-setup-poetry-project
+        uses: uwit-iam/action-setup-poetry-project@main
+        with:
+          credentials: ${{ secrets.MCI_GCLOUD_AUTH_JSON }}
+          enable_private_docker: true
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - uses: browser-actions/setup-chrome@v1
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run validation script
+        run: ./validate-strict.sh
         id: tox
-      - if: always()
+
+      - name: Check for artifacts
+        if: always()
         id: check-artifacts
         run: |
-          ls -alh
-          if [[ -f "./webdriver-report/report.json" ]]
-          then
-              echo "::set-output name=upload-webdriver-report::true"
+          if [[ -f "./webdriver-report/report.json" ]]; then
+            echo "upload-webdriver-report=true" >> "$GITHUB_ENV"
           fi
-          if [[ -f "./htmlcov/index.html" ]]
-          then
-              echo "::set-output name=upload-coverage-report::true"
+          if [[ -f "./htmlcov/index.html" ]]; then
+            echo "upload-coverage-report=true" >> "$GITHUB_ENV"
           fi
-      - if: always() && steps.check-artifacts.outputs.upload-webdriver-report
-        uses: actions/upload-artifact@v2
+
+      - name: Upload Webdriver Report
+        if: always() && env.upload-webdriver-report == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          name: web test storyboards for for ${{ github.sha }}
+          name: 'web test storyboards for ${{ github.sha }}'
           path: ./webdriver-report
-      - if: always() && steps.check-artifacts.outputs.upload-coverage-report
-        uses: actions/upload-artifact@v2
+
+      - name: Upload Coverage Report
+        if: always() && env.upload-coverage-report == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          name: coverage report for ${{ github.sha }}
+          name: 'coverage report for ${{ github.sha }}'
           path: ./htmlcov
