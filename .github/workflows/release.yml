@@ -2,7 +2,7 @@ name: Release new version of webdriver-recorder
 on:
   push:
     branches:
-      - master
+      - main
       - test-release-workflow
   workflow_dispatch:
     inputs:
@@ -30,7 +30,7 @@ jobs:
         run: |
           if [[ -n "${{ github.event.inputs.dry-run }}" ]]; then
             echo 'dry_run=${{ github.event.inputs.dry-run }}' >> $GITHUB_ENV
-          elif [[ "$(basename ${{ github.ref }})" == "master" ]]; then
+          elif [[ "$(basename ${{ github.ref }})" == "main" ]]; then
             echo 'dry_run=false' >> $GITHUB_ENV
           fi
 
